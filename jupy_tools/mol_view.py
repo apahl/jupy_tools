@@ -9,7 +9,8 @@ import base64
 import time
 from itertools import chain
 from io import BytesIO as IO
-
+import os
+import os.path as op
 from typing import Optional
 
 import pandas as pd
@@ -171,10 +172,11 @@ def mol_img_tag(mol, size=300, svg=None, options=None, hlsss=None, fn=None):
     img = mol_img_file(mol, size=size, svg=svg, hlsss=hlsss, fn=fn)
     if svg:
         # img = img.replace("\n", "")
-        img_list = img.splitlines()
         # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
-        img_list_new = [line for line in img_list[1:] if not line.startswith("<rect")]
-        img = "\n".join(img_list_new)
+        img_list = [
+            line for line in img.splitlines()[1:] if not line.startswith("<rect")
+        ]
+        img = "\n".join(img_list)
         img = bytes(img, encoding="iso-8859-1")
         img = b64_mol(img)
         # tag = """<img {} src="data:image/svg+xml;iso-8859-1,{}" alt="Mol"/>"""
@@ -248,6 +250,7 @@ def mol_grid(
     size=IMG_GRID_SIZE,
     as_html=True,
     svg=None,
+    img_folder=None,
     **kwargs,
 ):
     """Creates a HTML grid out of the DataFrame input.
@@ -263,6 +266,9 @@ def mol_grid(
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
+
+    if img_folder is not None:
+        os.makedirs(img_folder, exist_ok=True)
 
     interact = kwargs.get("interactive", False)
     link_templ = kwargs.get("link_templ", None)
@@ -347,10 +353,18 @@ def mol_grid(
             # img_opt["height"] = "{}px".format(size)
             # cell = templ.img(img_src, img_opt)
             if svg:
+                img_ext = "svg"
                 img_size = size
             else:
+                img_ext = "png"
                 img_size = size * 2
-            cell = mol_img_tag(mol, img_size, hlsss=hlsss_smi, options=img_opt)
+            if img_folder is not None and guessed_id is not None:
+                img_fn = op.join(img_folder, f"{rec[guessed_id]}.{img_ext}")
+            else:
+                img_fn = None
+            cell = mol_img_tag(
+                mol, img_size, hlsss=hlsss_smi, options=img_opt, fn=img_fn
+            )
 
             if link_col is not None:
                 link = link_templ.format(rec[link_col])
@@ -436,6 +450,8 @@ def write_mol_grid(
     smiles_col="Smiles",
     mol_col="Mol",
     id_col="Compound_Id",
+    write_images=False,
+    svg=None,
     **kwargs,
 ):
     """
@@ -446,6 +462,17 @@ def write_mol_grid(
         title: Document title.
         fn: Filename to write.
     """
+
+    if svg is None:
+        svg = SVG
+    assert isinstance(svg, bool)
+
+    if write_images:
+        html_dir = op.dirname(fn)
+        img_folder = op.join(html_dir, "images")
+    else:
+        img_folder = None
+
     tbl = mol_grid(
         df,
         title=title,
@@ -456,6 +483,8 @@ def write_mol_grid(
         id_col=id_col,
         size=IMG_GRID_SIZE,
         as_html=False,
+        img_folder=img_folder,
+        svg=svg,
         **kwargs,
     )
     header = kwargs.get("header", None)
