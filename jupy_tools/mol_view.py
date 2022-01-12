@@ -172,7 +172,9 @@ def mol_img_tag(mol, size=300, svg=None, options=None, hlsss=None, fn=None):
     if svg:
         # img = img.replace("\n", "")
         img_list = img.splitlines()
-        img = "\n".join(img_list[1:])
+        # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
+        img_list_new = [line for line in img_list[1:] if not line.startswith("<rect")]
+        img = "\n".join(img_list_new)
         img = bytes(img, encoding="iso-8859-1")
         img = b64_mol(img)
         # tag = """<img {} src="data:image/svg+xml;iso-8859-1,{}" alt="Mol"/>"""
