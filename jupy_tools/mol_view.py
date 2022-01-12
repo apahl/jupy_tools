@@ -97,7 +97,6 @@ def mol_img_file(mol, size=300, svg: Optional[bool] = None, hlsss=None, fn=None)
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
-    print(svg, SVG)
     if isinstance(mol, str):  # convert from Smiles on-the-fly, when necessary
         if len(mol) > 0:
             mol = Chem.MolFromSmiles(mol)
