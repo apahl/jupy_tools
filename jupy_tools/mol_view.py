@@ -344,7 +344,12 @@ def mol_grid(
 
             # img_opt["height"] = "{}px".format(size)
             # cell = templ.img(img_src, img_opt)
-            cell = mol_img_tag(mol, size * 2, hlsss=hlsss_smi, options=img_opt)
+            if svg:
+                img_size = size
+            else:
+                img_size = size * 2
+            cell = mol_img_tag(mol, img_size, hlsss=hlsss_smi, options=img_opt)
+
             if link_col is not None:
                 link = link_templ.format(rec[link_col])
                 a_opt = {"href": link}
