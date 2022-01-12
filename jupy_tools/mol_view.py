@@ -129,7 +129,12 @@ def mol_img_file(mol, size=300, svg: Optional[bool] = None, hlsss=None, fn=None)
     d2d.DrawMoleculeWithHighlights(mol, "", hl_atoms, {}, {}, {})
     d2d.FinishDrawing()
     img = d2d.GetDrawingText()
-    if not svg:
+    if svg:
+        # remove the opaque background ("<rect...")
+        img_list = [line for line in img.splitlines() if not line.startswith("<rect")]
+        img = "\n".join(img_list)
+
+    else:
         try:
             img = Image.open(IO(img))
             img = autocrop(img)
@@ -143,11 +148,13 @@ def mol_img_file(mol, size=300, svg: Optional[bool] = None, hlsss=None, fn=None)
         val = img_file.getvalue()
         img_file.close()
         img = val
+
+    # print(img)
+
     if fn is not None:
         if (svg and not fn.lower().endswith("svg")) or (
             not svg and not fn.lower().endswith("png")
         ):
-            print(svg)
             img_fmt = "SVG" if svg else "PNG"
             raise ValueError(
                 f"file ending of {fn} does not match drawing format {img_fmt}."
@@ -171,11 +178,8 @@ def mol_img_tag(mol, size=300, svg=None, options=None, hlsss=None, fn=None):
         options = ""
     img = mol_img_file(mol, size=size, svg=svg, hlsss=hlsss, fn=fn)
     if svg:
-        # img = img.replace("\n", "")
-        # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
-        img_list = [
-            line for line in img.splitlines()[1:] if not line.startswith("<rect")
-        ]
+        # skip the first line with the "<xml>" tag ("[1:]")
+        img_list = img.splitlines()[1:]
         img = "\n".join(img_list)
         img = bytes(img, encoding="iso-8859-1")
         img = b64_mol(img)
@@ -186,7 +190,6 @@ def mol_img_tag(mol, size=300, svg=None, options=None, hlsss=None, fn=None):
     else:
         tag = """<img {} src="data:image/png;base64,{}" alt="Mol"/>"""
         img_tag = tag.format(options, b64_mol(img))
-    # print(img_tag)
     return img_tag
 
 
