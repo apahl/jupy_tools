@@ -130,8 +130,10 @@ def mol_img_file(mol, size=300, svg: Optional[bool] = None, hlsss=None, fn=None)
     d2d.FinishDrawing()
     img = d2d.GetDrawingText()
     if svg:
-        # remove the opaque background ("<rect...")
-        img_list = [line for line in img.splitlines() if not line.startswith("<rect")]
+        # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
+        img_list = [
+            line for line in img.splitlines()[1:] if not line.startswith("<rect")
+        ]
         img = "\n".join(img_list)
 
     else:
@@ -178,9 +180,6 @@ def mol_img_tag(mol, size=300, svg=None, options=None, hlsss=None, fn=None):
         options = ""
     img = mol_img_file(mol, size=size, svg=svg, hlsss=hlsss, fn=fn)
     if svg:
-        # skip the first line with the "<xml>" tag ("[1:]")
-        img_list = img.splitlines()[1:]
-        img = "\n".join(img_list)
         img = bytes(img, encoding="iso-8859-1")
         img = b64_mol(img)
         # tag = """<img {} src="data:image/svg+xml;iso-8859-1,{}" alt="Mol"/>"""
