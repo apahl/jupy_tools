@@ -11,7 +11,7 @@ from itertools import chain
 from io import BytesIO as IO
 import os
 import os.path as op
-from typing import Optional
+from typing import Optional, Union
 
 import pandas as pd
 import numpy as np
@@ -21,6 +21,7 @@ pd.set_option("display.max_colwidth", None)
 from PIL import Image, ImageChops
 
 from rdkit.Chem import AllChem as Chem
+from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdCoordGen import AddCoords  # New coord. generation
 from rdkit.Chem import Draw
 from rdkit.Chem.Draw import rdMolDraw2D
@@ -94,102 +95,123 @@ def autocrop(im, bgcolor="white"):
     return None  # no contents
 
 
-def mol_img_file(mol, size=300, svg: Optional[bool] = None, hlsss=None, fn=None):
-    if svg is None:
-        svg = SVG
-    assert isinstance(svg, bool)
-    if isinstance(mol, str):  # convert from Smiles on-the-fly, when necessary
-        if len(mol) > 0:
-            mol = Chem.MolFromSmiles(mol)
-        else:
-            mol = Chem.MolFromSmiles("*")
-    if mol is None or mol is np.nan:
-        mol = Chem.MolFromSmiles("*")
-    if hlsss is not None:
-        if isinstance(hlsss, str):
-            hlsss = hlsss.split(",")
-            atoms = set()
-            for smi in hlsss:
-                m = Chem.MolFromSmiles(smi)
-                if m:
-                    matches = list(chain(*mol.GetSubstructMatches(m)))
-                else:
-                    matches = []
-                if len(matches) > 0:
-                    atoms = atoms.union(set(matches))
-        hl_atoms = {x: "#ff0000" for x in list(atoms)}
-    else:
-        hl_atoms = {}
-
-    add_coords(mol)
-    if svg:
-        d2d = rdMolDraw2D.MolDraw2DSVG(size, size)
-    else:
-        d2d = rdMolDraw2D.MolDraw2DCairo(size, size)
-    d2d.DrawMoleculeWithHighlights(mol, "", hl_atoms, {}, {}, {})
-    d2d.FinishDrawing()
-    img = d2d.GetDrawingText()
-    if svg:
-        # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
-        img_list = [
-            line for line in img.splitlines()[1:] if not line.startswith("<rect")
-        ]
-        img = "\n".join(img_list)
-
-    else:
-        try:
-            img = Image.open(IO(img))
-            img = autocrop(img)
-        except UnicodeEncodeError:
-            print(Chem.MolToSmiles(mol))
-            mol = Chem.MolFromSmiles("*")
-            img = autocrop(Draw.MolToImage(mol, size=(size, size)))
-        img = make_transparent(img)
-        img_file = IO()
-        img.save(img_file, format="PNG")
-        val = img_file.getvalue()
-        img_file.close()
-        img = val
-
-    # print(img)
-
-    if fn is not None:
-        if (svg and not fn.lower().endswith("svg")) or (
-            not svg and not fn.lower().endswith("png")
-        ):
-            img_fmt = "SVG" if svg else "PNG"
-            raise ValueError(
-                f"file ending of {fn} does not match drawing format {img_fmt}."
-            )
-        with open(fn, "w") as f:
-            f.write(img)
-    return img
-
-
 def b64_mol(img_file):
     b64 = base64.b64encode(img_file)
     b64 = b64.decode()
     return b64
 
 
-def mol_img_tag(mol, size=300, svg=None, options=None, hlsss=None, fn=None):
-    if svg is None:
-        svg = SVG
-    assert isinstance(svg, bool)
-    if options is None:
-        options = ""
-    img = mol_img_file(mol, size=size, svg=svg, hlsss=hlsss, fn=fn)
-    if svg:
-        img = bytes(img, encoding="iso-8859-1")
-        img = b64_mol(img)
-        # tag = """<img {} src="data:image/svg+xml;iso-8859-1,{}" alt="Mol"/>"""
-        tag = """<img {} src="data:image/svg+xml;base64,{}" alt="Mol"/>"""
-        img_tag = tag.format(options, img)
-        # print(img_tag)
-    else:
-        tag = """<img {} src="data:image/png;base64,{}" alt="Mol"/>"""
-        img_tag = tag.format(options, b64_mol(img))
-    return img_tag
+class MolImage:
+    def __init__(
+        self,
+        mol: Union[Mol, str],
+        size: int = 300,
+        svg: Optional[bool] = None,
+        hlsss: Optional[str] = None,
+        options: Optional[str] = None,
+    ):
+        """
+        Generate an image (SVG or PNG) of a molecule.
+        After calling the constructor, the image is stored in the `txt` attribute.
+        A HTML image tag is available in the `tag` attribute.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol or Smiles string
+            Molecule to draw.
+        size : int
+            Size of the image in pixels (default=300).
+        svg : bool or None
+            If True, the image is saved as SVG. Otherwise, it is saved as PNG.
+        hlsss : str or None
+            Highlight the substructure given as Smiles.
+        options : str or None
+            Additional HTML options for the drawing.
+        """
+        self.mol = mol
+        if isinstance(self.mol, str):  # convert from Smiles on-the-fly, when necessary
+            if len(self.mol) > 0:
+                self.mol = Chem.MolFromSmiles(mol)
+            else:
+                self.mol = Chem.MolFromSmiles("*")
+        if self.mol is None or self.mol is np.nan:
+            self.mol = Chem.MolFromSmiles("*")
+
+        self.size = size
+        self.svg = svg if svg is not None else SVG
+        assert isinstance(self.svg, bool)
+        self.hlsss = hlsss
+
+        if hlsss is not None:
+            if isinstance(hlsss, str):
+                hlsss = hlsss.split(",")
+                atoms = set()
+                for smi in hlsss:
+                    m = Chem.MolFromSmiles(smi)
+                    if m:
+                        matches = list(chain(*self.mol.GetSubstructMatches(m)))
+                    else:
+                        matches = []
+                    if len(matches) > 0:
+                        atoms = atoms.union(set(matches))
+            hl_atoms = {x: "#ff0000" for x in list(atoms)}
+        else:
+            hl_atoms = {}
+
+        add_coords(self.mol)
+        if svg:
+            d2d = rdMolDraw2D.MolDraw2DSVG(size, size)
+        else:
+            d2d = rdMolDraw2D.MolDraw2DCairo(size, size)
+        d2d.DrawMoleculeWithHighlights(self.mol, "", hl_atoms, {}, {}, {})
+        d2d.FinishDrawing()
+        img = d2d.GetDrawingText()
+        if svg:
+            # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
+            img_list = [
+                line for line in img.splitlines()[1:] if not line.startswith("<rect")
+            ]
+            img = "\n".join(img_list)
+
+        else:
+            try:
+                img = Image.open(IO(img))
+                img = autocrop(img)
+            except UnicodeEncodeError:
+                print(Chem.MolToSmiles(mol))
+                mol = Chem.MolFromSmiles("*")
+                img = autocrop(Draw.MolToImage(mol, size=(size, size)))
+            img = make_transparent(img)
+            img_file = IO()
+            img.save(img_file, format="PNG")
+            val = img_file.getvalue()
+            img_file.close()
+            img = val
+
+        self.txt = img
+
+        if options is None:
+            options = ""
+        if svg:
+            img = bytes(self.txt, encoding="iso-8859-1")
+            img = b64_mol(img)
+            tag = """<img {} src="data:image/svg+xml;base64,{}" alt="Mol"/>"""
+            self.tag = tag.format(options, img)
+        else:
+            tag = """<img {} src="data:image/png;base64,{}" alt="Mol"/>"""
+            self.tag = tag.format(options, b64_mol(img))
+
+    def save(self, fn):
+        if (self.svg and not fn.lower().endswith("svg")) or (
+            not self.svg and not fn.lower().endswith("png")
+        ):
+            img_fmt = "SVG" if self.svg else "PNG"
+            raise ValueError(
+                f"file ending of {fn} does not match drawing format {img_fmt}."
+            )
+        mode = "w" if self.svg else "wb"
+        with open(fn, mode) as f:
+            f.write(self.txt)
 
 
 def write(text, fn):
@@ -197,8 +219,8 @@ def write(text, fn):
         f.write(text)
 
 
-def _mol_img_tag(mol):
-    return pd.Series(mol_img_tag(mol))
+# def _mol_img_tag(mol):
+#     return pd.Series(mol_img_tag(mol))
 
 
 def _apply_link(input, link, ln_title="Link"):
@@ -223,8 +245,8 @@ def show_mols(mols_or_smiles, cols=5, svg=None):
         mols_or_smiles = [mols_or_smiles]
     for mol in mols_or_smiles:
         idx += 1
-        img = mol_img_tag(mol, svg=svg)
-        cell = "<td>{}<td>".format(img)
+        mol_img = MolImage(mol, svg=svg)
+        cell = "<td>{}<td>".format(mol_img.tag)
         row_line.append(cell)
         if idx == cols:
             row = "<tr>" + "".join(row_line) + "</td>"
@@ -364,9 +386,13 @@ def mol_grid(
                 img_fn = op.join(img_folder, f"{rec[guessed_id]}.{img_ext}")
             else:
                 img_fn = None
-            cell = mol_img_tag(
-                mol, img_size, hlsss=hlsss_smi, options=img_opt, fn=img_fn
+            img_opt = " ".join([f'{k}="{str(v)}"' for k, v in img_opt.items()])
+            mol_img = MolImage(
+                mol, svg=svg, size=img_size, hlsss=hlsss_smi, options=img_opt
             )
+            if img_fn is not None:
+                mol_img.save(img_fn)
+            cell = mol_img.tag
 
             if link_col is not None:
                 link = link_templ.format(rec[link_col])
