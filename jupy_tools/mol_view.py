@@ -31,7 +31,7 @@ from . import utils, templ
 USE_RDKIT_NEW_COORD = True
 BGCOLOR = "#94CAEF"
 IMG_GRID_SIZE = 235
-SVG = False
+SVG = True
 
 
 def is_interactive_ipython():
