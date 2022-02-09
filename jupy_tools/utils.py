@@ -27,10 +27,15 @@ try:
 except ImportError:
     TQDM = False
 
+    def tqdm(x):
+        return x
+
+
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import DataStructs
 import rdkit.Chem.Descriptors as Desc
+from rdkit.Chem.Scaffolds import MurckoScaffold
 
 # from rdkit.Chem.MolStandardize import rdMolStandardize
 # from rdkit.Chem.MolStandardize.validate import Validator
@@ -47,6 +52,42 @@ molvs_s = Standardizer()
 molvs_l = LargestFragmentChooser()
 molvs_u = Uncharger()
 molvs_t = TautomerCanonicalizer(max_tautomers=100)
+
+INTERACTIVE = True
+MIN_NUM_RECS_PROGRESS = 500
+
+
+def is_interactive_ipython():
+    try:
+        get_ipython()  # type: ignore
+        ipy = True
+    except NameError:
+        ipy = False
+    return ipy
+
+
+NOTEBOOK = is_interactive_ipython()
+if NOTEBOOK:
+    try:
+        from tqdm.notebook import tqdm
+
+        tqdm.pandas()
+        TQDM = True
+    except ImportError:
+        TQDM = False
+
+
+def result_info(df: pd.DataFrame, fn: str, what: str = ""):
+    """Print information about the result from a function,
+    when INTERACTIVE is True.
+
+    Parameters:
+    ===========
+    df: the result DataFrame
+    fn: the name of the function
+    what: the result of the function"""
+    shape = df.shape
+    print(f"{fn:25s}: [ {shape[0]:6d} / {shape[1]:3d} ] {what}")
 
 
 def get_value(str_val):
@@ -68,6 +109,14 @@ def fp_ecfc4_from_smiles(smi):
         return np.nan
     fp = Chem.GetMorganFingerprint(mol, 2)
     return fp
+
+
+def remove_nans(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Remove rows containing NANs in the `column`."""
+    result = df[df[column].notna()]
+    if INTERACTIVE:
+        result_info(result, "remove_nans", f"{len(df) - len(result):4d} rows removed.")
+    return result
 
 
 def read_sdf(
@@ -163,6 +212,8 @@ def read_sdf(
             assert k_len == len(d[k]), f"{k_len=} != {len(d[k])}"
     result = pd.DataFrame(d)
     print(ctr)
+    if INTERACTIVE:
+        result_info(result, "read_sdf")
     return result
 
 
@@ -221,16 +272,23 @@ def add_mol_col(df: pd.DataFrame, smiles_col="Smiles") -> pd.DataFrame:
     A DataFrame with a column containing the RDKit Molecule.
     """
 
-    df["Mol"] = df[smiles_col].apply(smiles_to_mol)
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df["Mol"] = df[smiles_col].progress_apply(smiles_to_mol)
+    else:
+        df["Mol"] = df[smiles_col].apply(smiles_to_mol)
     return df
 
 
 def drop_cols(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
     """Remove the list of columns from the dataframe.
     Listed columns that are not available in the dataframe are simply ignored."""
+    shape1 = df.shape
     df = df.copy()
     cols_to_remove = set(cols).intersection(set(df.keys()))
     df = df.drop(cols_to_remove, axis=1)
+    shape2 = df.shape
+    if INTERACTIVE:
+        result_info(df, "drop_cols", f"{shape1[1] - shape2[1]:2d} columns removed.")
     return df
 
 
@@ -379,6 +437,7 @@ def filter_mols(
                 return True
         return False
 
+    shape1 = df.shape
     df = df.copy()
     if isinstance(filter, str):
         filter = [filter]
@@ -393,7 +452,7 @@ def filter_mols(
         cols_to_remove.append("Mol")
     print(f"Applying filters ({len(filter)})...")
     df = df[~df["Mol"].isnull()]
-    for filt in filter:
+    for filt in tqdm(filter):
         if filt == "Isotopes":
             # df = apply_to_smiles(df, smiles_col, {"FiltIsotopes": has_isotope})
             df["FiltIsotopes"] = df["Mol"].apply(has_isotope)
@@ -433,6 +492,7 @@ def filter_mols(
             #     df, smiles_col, {"FiltInChiKey": Chem.inchi.MolToInchiKey}
             # )
             df["FiltInChiKey"] = df["Mol"].apply(Chem.inchi.MolToInchiKey)
+            df = df[df["FiltInChIKey"].notna()]
             df = df.drop_duplicates(subset="FiltInChiKey")
             cols_to_remove.append("FiltInChiKey")
             print(f"Applied filter {filt}: ", end="")
@@ -441,6 +501,9 @@ def filter_mols(
             raise ValueError(f"Unknown filter: {filt}.")
         print(len(df))
     df = drop_cols(df, cols_to_remove)
+    shape2 = df.shape
+    if INTERACTIVE:
+        result_info(df, "filter_mols", f"{shape1[0] - shape2[0]:4d} rows removed.")
     return df
 
 
@@ -476,6 +539,9 @@ def filter_smiles(
     medchem_atoms = {1, 5, 6, 7, 8, 9, 15, 16, 17, 35, 53}  # 5: Boron
     min_heavy_atoms = kwargs.get("min_heavy_atoms", 3)
     max_heavy_atoms = kwargs.get("max_heavy_atoms", 50)
+    global INTERACTIVE
+    interact_flag = INTERACTIVE
+    INTERACTIVE = False  # Disble INFO messages
 
     def has_non_medchem_atoms(smiles) -> bool:
         mol = smiles_to_mol(smiles)
@@ -500,12 +566,7 @@ def filter_smiles(
             return 0
         return Desc.HeavyAtomCount(mol)
 
-    def inchi(smiles) -> str:
-        mol = smiles_to_mol(smiles)
-        if mol is np.nan:
-            return "NoMol"
-        return Chem.inchi.MolToInchiKey(mol)
-
+    shape1 = df.shape
     df = df.copy()
     if isinstance(filter, str):
         filter = [filter]
@@ -516,7 +577,7 @@ def filter_smiles(
     cols_to_remove = []
     print(f"Applying filters ({len(filter)})...")
     df = df[~df["Smiles"].isnull()]
-    for filt in filter:
+    for filt in tqdm(filter):
         if filt == "Isotopes":
             # df = apply_to_smiles(df, smiles_col, {"FiltIsotopes": has_isotope})
             df["FiltIsotopes"] = df[smiles_col].apply(has_isotope)
@@ -552,8 +613,9 @@ def filter_smiles(
             # df = apply_to_smiles(
             #     df, smiles_col, {"FiltInChiKey": Chem.inchi.MolToInchiKey}
             # )
-            df["FiltInChiKey"] = df[smiles_col].apply(inchi)
-            df = df[~df["FiltInChiKey"] == "NoMol"]
+            df = inchi_from_smiles(
+                df, smiles_col=smiles_col, inchi_col="FiltInChiKey", filter_nans=True
+            )
             df = df.drop_duplicates(subset="FiltInChiKey")
             cols_to_remove.append("FiltInChiKey")
             print(f"Applied filter {filt}: ", end="")
@@ -562,6 +624,143 @@ def filter_smiles(
             raise ValueError(f"Unknown filter: {filt}.")
         print(len(df))
     df = drop_cols(df, cols_to_remove)
+
+    INTERACTIVE = interact_flag  # Restore option for showing INFO messages
+    if INTERACTIVE:
+        shape2 = df.shape
+        result_info(df, "filter_smiles", f"{shape1[0] - shape2[0]:4d} rows removed.")
+    return df
+
+
+def calc_from_smiles(
+    df: pd.DataFrame, new_col, func: Callable, smiles_col="Smiles", filter_nans=True
+) -> pd.DataFrame:
+    """Calculate a new column that would require a molecule as input
+    directly from a Smiles column.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The dataframe to apply the function to.
+    new_col: str
+        The name of the new column to create.
+    func: Callable
+        The function to apply to the molecule column.
+    smiles_col: str
+        The name of the column containing the Smiles strings for the molecules.
+    filter_nans: bool
+        If True, remove rows with NaN values.
+    """
+
+    def _smiles_func(smiles):
+        mol = smiles_to_mol(smiles)
+        if mol is np.nan:
+            return np.nan
+        return func(mol)
+
+    shape1 = df.shape
+    df = df.copy()
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df[new_col] = df[smiles_col].progress_apply(_smiles_func)
+    else:
+        df[new_col] = df[smiles_col].apply(_smiles_func)
+    if filter_nans:
+        df = df[df[new_col].notna()]
+        if INTERACTIVE:
+            shape2 = df.shape
+            result_info(
+                df,
+                "calc_from_smiles",
+                f"{shape1[0] - shape2[0]:4d} rows removed because of nans.",
+            )
+    return df
+
+
+def inchi_from_smiles(
+    df: pd.DataFrame, smiles_col="Smiles", inchi_col="InChIKey", filter_nans=True
+) -> pd.DataFrame:
+    """Generate InChIKeys from Smiles.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The dataframe to apply the function to.
+    smiles_col: str
+        The name of the column containing the Smiles strings.
+    inchi_col: str
+        The name of the column to store the InChIKeys (default: "InChIKey").
+    filter_nans: bool
+        If True, remove rows with NaN in the InChIKey column.
+
+    Returns:
+    ========
+    pd.DataFrame
+        The dataframe with the Murcko scaffolds and the InChIKeys of the scaffolds.
+    """
+
+    shape1 = df.shape
+    df = df.copy()
+    df = calc_from_smiles(
+        df,
+        inchi_col,
+        Chem.inchi.MolToInchiKey,
+        smiles_col=smiles_col,
+    )
+    if filter_nans:
+        df = df[df[inchi_col].notna()]
+        if INTERACTIVE:
+            shape2 = df.shape
+            result_info(
+                df, "inchi_from_smiles", f"{shape1[0] - shape2[0]:4d} rows removed."
+            )
+    return df
+
+
+def murcko_from_smiles(
+    df: pd.DataFrame, smiles_col="Smiles", murcko_col="Murcko_Smiles", filter_nans=True
+) -> pd.DataFrame:
+    """Generate Murcko scaffolds from Smiles.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The dataframe to apply the function to.
+    smiles_col: str
+        The name of the column containing the Smiles strings.
+    murcko_col: str
+        The name of the column to store the Murcko scaffolds as Smiles (default: "MurckoSmiles").
+    filter_nans: bool
+        If True, remove rows with NaN in the Murcko column (default: True).
+
+    Returns:
+    ========
+    pd.DataFrame
+        The dataframe with the Murcko scaffolds and the InChIKeys of the scaffolds.
+    """
+
+    global INTERACTIVE
+    interact_flag = INTERACTIVE
+    shape1 = df.shape
+    df = df.copy()
+    df = calc_from_smiles(
+        df,
+        murcko_col,
+        lambda x: MurckoScaffold.MurckoScaffoldSmiles(mol=x),
+        smiles_col=smiles_col,
+    )
+    # Temporariliy turn off INTERACTIVE output to avoid printing the info multiple times
+    INTERACTIVE = False
+    df = inchi_from_smiles(
+        df, smiles_col=murcko_col, inchi_col="Murcko_InChIKey", filter_nans=filter_nans
+    )
+    INTERACTIVE = interact_flag  # restore previous value
+    if filter_nans:
+        df = df[df[murcko_col].notna()]
+        shape2 = df.shape
+        if INTERACTIVE:
+            result_info(
+                df, "murcko_from_smiles", f"{shape1[0] - shape2[0]:4d} rows removed."
+            )
     return df
 
 
@@ -582,9 +781,14 @@ def sss(df: pd.DataFrame, query: str, smiles_col="Smiles") -> pd.DataFrame:
 
     q = Chem.MolFromSmiles(query)
     df = df.copy()
-    df["Found"] = df[smiles_col].map(lambda x: _sss(x, q))
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df["Found"] = df[smiles_col].progress_apply(lambda x: _sss(x, q))
+    else:
+        df["Found"] = df[smiles_col].apply(lambda x: _sss(x, q))
     df = df[df["Found"]]
     df.drop("Found", axis=1, inplace=True)
+    if INTERACTIVE:
+        result_info(df, "sss")
     return df
 
 
@@ -609,8 +813,15 @@ def sim_search(
     fp = fp_ecfc4_from_smiles(query)
     assert fp is not np.nan, "Query must be a valid SMILES"
     df = df.copy()
-    df["Sim"] = df[fp_col].map(lambda x: DataStructs.TanimotoSimilarity(x, fp))
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df["Sim"] = df[fp_col].progress_apply(
+            lambda x: DataStructs.TanimotoSimilarity(x, fp)
+        )
+    else:
+        df["Sim"] = df[fp_col].apply(lambda x: DataStructs.TanimotoSimilarity(x, fp))
     df = df[df["Sim"] >= cutoff]
+    if INTERACTIVE:
+        result_info(df, "sim_search")
     return df
 
 
@@ -627,6 +838,8 @@ def read_tsv(input_tsv: str, sep="\t") -> pd.DataFrame:
     """
     input_tsv = input_tsv.replace("file://", "")
     df = pd.read_csv(input_tsv, sep=sep)
+    if INTERACTIVE:
+        result_info(df, "read_tsv")
     return df
 
 
@@ -824,7 +1037,7 @@ def listify(s, sep=" ", as_int=True, strip=True):
 
 
 def filter(
-    df: pd.DataFrame, mask, reset_index=True, print_len=True
+    df: pd.DataFrame, mask, reset_index=True
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Filters a dataframe and returns the passing fraction and the failing fraction as
     two separate dataframes.
@@ -835,8 +1048,9 @@ def filter(
     if reset_index:
         df_pass = df_pass.reset_index(drop=True)
         df_fail = df_fail.reset_index(drop=True)
-    if print_len:
-        print(f"Pass: {len(df_pass):8d}  Fail: {len(df_fail):8d}")
+    if INTERACTIVE:
+        result_info(df_pass, "filter_pass")
+        result_info(df_fail, "filter_fail")
     return df_pass, df_fail
 
 
@@ -883,6 +1097,8 @@ def groupby(df_in, by=None, num_agg=["median", "mad", "count"], str_agg="unique"
         for col in df.columns.values
     ]
     df.columns = df_cols
+    if INTERACTIVE:
+        result_info(df, "group_by")
     return df
 
 
