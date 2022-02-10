@@ -77,7 +77,7 @@ if NOTEBOOK:
         TQDM = False
 
 
-def result_info(df: pd.DataFrame, fn: str, what: str = ""):
+def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
     """Print information about the result from a function,
     when INTERACTIVE is True.
 
@@ -86,8 +86,15 @@ def result_info(df: pd.DataFrame, fn: str, what: str = ""):
     df: the result DataFrame
     fn: the name of the function
     what: the result of the function"""
+    if len(what) > 0:
+        what = f"{what} "
     shape = df.shape
-    print(f"{fn:25s}: [ {shape[0]:6d} / {shape[1]:3d} ] {what}")
+    keys = ""
+    if shape[1] < 10:
+        keys = ", ".join(df.keys())
+        if len(keys) < 80:
+            keys = f"( {keys} )"
+    print(f"{fn:25s}: [ {shape[0]:6d} / {shape[1]:3d} ] {what}{keys}")
 
 
 def get_value(str_val):
@@ -111,11 +118,20 @@ def fp_ecfc4_from_smiles(smi):
     return fp
 
 
+def count_nans(df: pd.DataFrame, column: str) -> int:
+    """Count rows containing NANs in the `column`."""
+    result = df[column].isna().sum()
+    if INTERACTIVE:
+        fn = "count_nans"
+        print(f"{fn:25s}: [ {result:6d}       ] rows with NAN values in col `{column}`")
+    return result
+
+
 def remove_nans(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """Remove rows containing NANs in the `column`."""
     result = df[df[column].notna()]
     if INTERACTIVE:
-        result_info(result, "remove_nans", f"{len(df) - len(result):4d} rows removed.")
+        info(result, "remove_nans", f"{len(df) - len(result):4d} rows removed.")
     return result
 
 
@@ -213,7 +229,7 @@ def read_sdf(
     result = pd.DataFrame(d)
     print(ctr)
     if INTERACTIVE:
-        result_info(result, "read_sdf")
+        info(result, "read_sdf")
     return result
 
 
@@ -288,7 +304,7 @@ def drop_cols(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
     df = df.drop(cols_to_remove, axis=1)
     shape2 = df.shape
     if INTERACTIVE:
-        result_info(df, "drop_cols", f"{shape1[1] - shape2[1]:2d} columns removed.")
+        info(df, "drop_cols", f"{shape1[1] - shape2[1]:2d} columns removed.")
     return df
 
 
@@ -503,7 +519,7 @@ def filter_mols(
     df = drop_cols(df, cols_to_remove)
     shape2 = df.shape
     if INTERACTIVE:
-        result_info(df, "filter_mols", f"{shape1[0] - shape2[0]:4d} rows removed.")
+        info(df, "filter_mols", f"{shape1[0] - shape2[0]:4d} rows removed.")
     return df
 
 
@@ -628,7 +644,7 @@ def filter_smiles(
     INTERACTIVE = interact_flag  # Restore option for showing INFO messages
     if INTERACTIVE:
         shape2 = df.shape
-        result_info(df, "filter_smiles", f"{shape1[0] - shape2[0]:4d} rows removed.")
+        info(df, "filter_smiles", f"{shape1[0] - shape2[0]:4d} rows removed.")
     return df
 
 
@@ -668,7 +684,7 @@ def calc_from_smiles(
         df = df[df[new_col].notna()]
         if INTERACTIVE:
             shape2 = df.shape
-            result_info(
+            info(
                 df,
                 "calc_from_smiles",
                 f"{shape1[0] - shape2[0]:4d} rows removed because of nans.",
@@ -710,9 +726,7 @@ def inchi_from_smiles(
         df = df[df[inchi_col].notna()]
         if INTERACTIVE:
             shape2 = df.shape
-            result_info(
-                df, "inchi_from_smiles", f"{shape1[0] - shape2[0]:4d} rows removed."
-            )
+            info(df, "inchi_from_smiles", f"{shape1[0] - shape2[0]:4d} rows removed.")
     return df
 
 
@@ -758,9 +772,7 @@ def murcko_from_smiles(
         df = df[df[murcko_col].notna()]
         shape2 = df.shape
         if INTERACTIVE:
-            result_info(
-                df, "murcko_from_smiles", f"{shape1[0] - shape2[0]:4d} rows removed."
-            )
+            info(df, "murcko_from_smiles", f"{shape1[0] - shape2[0]:4d} rows removed.")
     return df
 
 
@@ -788,7 +800,7 @@ def sss(df: pd.DataFrame, query: str, smiles_col="Smiles") -> pd.DataFrame:
     df = df[df["Found"]]
     df.drop("Found", axis=1, inplace=True)
     if INTERACTIVE:
-        result_info(df, "sss")
+        info(df, "sss")
     return df
 
 
@@ -821,7 +833,7 @@ def sim_search(
         df["Sim"] = df[fp_col].apply(lambda x: DataStructs.TanimotoSimilarity(x, fp))
     df = df[df["Sim"] >= cutoff]
     if INTERACTIVE:
-        result_info(df, "sim_search")
+        info(df, "sim_search")
     return df
 
 
@@ -839,7 +851,7 @@ def read_tsv(input_tsv: str, sep="\t") -> pd.DataFrame:
     input_tsv = input_tsv.replace("file://", "")
     df = pd.read_csv(input_tsv, sep=sep)
     if INTERACTIVE:
-        result_info(df, "read_tsv")
+        info(df, "read_tsv")
     return df
 
 
@@ -1049,8 +1061,8 @@ def filter(
         df_pass = df_pass.reset_index(drop=True)
         df_fail = df_fail.reset_index(drop=True)
     if INTERACTIVE:
-        result_info(df_pass, "filter_pass")
-        result_info(df_fail, "filter_fail")
+        info(df_pass, "filter_pass")
+        info(df_fail, "filter_fail")
     return df_pass, df_fail
 
 
@@ -1098,7 +1110,7 @@ def groupby(df_in, by=None, num_agg=["median", "mad", "count"], str_agg="unique"
     ]
     df.columns = df_cols
     if INTERACTIVE:
-        result_info(df, "group_by")
+        info(df, "group_by")
     return df
 
 
