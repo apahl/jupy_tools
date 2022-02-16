@@ -1190,8 +1190,8 @@ def pandas_info():
             df_pass = df_pass.reset_index(drop=True)
             df_fail = df_fail.reset_index(drop=True)
         if INTERACTIVE:
-            info(df_pass, "filter_pass")
-            info(df_fail, "filter_fail")
+            info(df_pass, "query_pass")
+            info(df_fail, "query_fail")
         return df_pass, df_fail
 
     DataFrame.iquery = inner_query
