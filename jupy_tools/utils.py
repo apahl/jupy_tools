@@ -15,6 +15,8 @@ from contextlib import contextmanager
 from typing import List, Set, Callable, Union, Tuple
 
 import pandas as pd
+from pandas.core.frame import DataFrame
+
 import numpy as np
 
 from multiprocessing import Pool
@@ -1056,7 +1058,7 @@ def filter(
 
     Returns: passing and failing dataframe."""
     df_pass = df[mask].copy()
-    df_fail = df[~mask].copy()
+    df_fail = df[~df.index.isin(df_pass.index)].copy()
     if reset_index:
         df_pass = df_pass.reset_index(drop=True)
         df_fail = df_fail.reset_index(drop=True)
@@ -1161,3 +1163,35 @@ def timeout(time):
     finally:
         # unregister the signal so it won't be triggered if the timeout is not reached
         signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+
+# Pandas extensions
+def pandas_info():
+    """Adds the following extensions to the Pandas DataFrame:
+    - `iquery`: same as the DF `query`, but prints info about the shape of the result.
+    - `ifilter`
+
+
+    See also: `filter` from this module, which returns both the passing and the failing dataframes."""
+
+    DataFrame.ifilter = filter
+
+    def inner_query(
+        df: pd.DataFrame, query: str, reset_index=True
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Queries a dataframe using pandas `query` syntax
+        and returns the passing fraction and the failing fraction as
+        two separate dataframes.
+
+        Returns: passing and failing dataframe."""
+        df_pass = df.query(query).copy()
+        df_fail = df[~df.index.isin(df_pass.index)].copy()
+        if reset_index:
+            df_pass = df_pass.reset_index(drop=True)
+            df_fail = df_fail.reset_index(drop=True)
+        if INTERACTIVE:
+            info(df_pass, "filter_pass")
+            info(df_fail, "filter_fail")
+        return df_pass, df_fail
+
+    DataFrame.iquery = inner_query
