@@ -48,6 +48,17 @@ IPYTHON = is_interactive_ipython()
 if IPYTHON:
     from IPython.core.display import HTML
 
+# Enable some additional functionality if the cellpainting module is available:
+try:
+    from cellpainting3 import tools as cpt
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import gc
+
+    CELLPAINTING = True
+except ImportError:
+    CELLPAINTING = False
+
 
 def rescale(mol, f=1.4):
     tm = np.zeros((4, 4), np.double)
@@ -98,6 +109,16 @@ def autocrop(im, bgcolor="white"):
 def b64_mol(img_file):
     b64 = base64.b64encode(img_file)
     b64 = b64.decode()
+    return b64
+
+
+def b64_fig(chart, format="PNG"):
+    fig = chart.get_figure()
+    img_file = IO()
+    fig.savefig(img_file, format=format, bbox_inches="tight")
+    b64 = base64.b64encode(img_file.getvalue())
+    b64 = b64.decode()
+    img_file.close()
     return b64
 
 
@@ -273,6 +294,7 @@ def mol_grid(
     id_col="Compound_Id",
     size=IMG_GRID_SIZE,
     as_html=True,
+    cluster_profiles=False,
     svg=None,
     img_folder=None,
     **kwargs,
@@ -290,6 +312,16 @@ def mol_grid(
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
+
+    if cluster_profiles:
+        # Cluster profiles can only be shown when the Cell Painting module is available.
+        cluster_profiles = CELLPAINTING
+    if cluster_profiles:
+        cluster_names = [
+            x for x in cpt.get_func_cluster_names(prefix="Cluster_") if x in df.columns
+        ]
+        cluster_names_short = [x[8:] for x in cluster_names]
+        hide.extend(cluster_names)
 
     if img_folder is not None:
         os.makedirs(img_folder, exist_ok=True)
@@ -337,6 +369,7 @@ def mol_grid(
     rows = []
     id_cells = []
     mol_cells = []
+    chart_cells = []
     for idx, (_, rec) in enumerate(df.iterrows(), 1):
         mol = rec[mol_col]
         if guessed_id:
@@ -409,6 +442,19 @@ def mol_grid(
 
         mol_cells.extend(templ.td(cell, td_opt))
 
+        if cluster_profiles:
+            plt.figure(figsize=(6, 6))
+            cl_sims = rec[cluster_names].values
+            chart = sns.barplot(cluster_names_short, cl_sims, color="#94caef")
+            plt.xticks(rotation=90)
+            bf = b64_fig(chart)
+            chart_tag = f"""<img width="{IMG_GRID_SIZE}" src="data:image/png;base64,{bf}" alt="Chart"/>"""
+            chart_cells.extend(templ.td(chart_tag, td_opt))
+
+            plt.clf()
+            plt.close()
+            gc.collect()
+
         if len(props) > 0:
             for prop_no, prop in enumerate(props):
                 prop_opt = {"style": "text-align: left;"}
@@ -443,6 +489,8 @@ def mol_grid(
             if guessed_id:
                 rows.extend(templ.tr(id_cells))
             rows.extend(templ.tr(mol_cells))
+            if cluster_profiles:
+                rows.extend(templ.tr(chart_cells))
 
             if len(props) > 0:
                 colspan_factor = 2
@@ -457,6 +505,7 @@ def mol_grid(
             rows.extend(empty_row)
             id_cells = []
             mol_cells = []
+            chart_cells = []
 
     table_list.extend(templ.table(rows))
 
