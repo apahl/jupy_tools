@@ -48,16 +48,15 @@ IPYTHON = is_interactive_ipython()
 if IPYTHON:
     from IPython.core.display import HTML
 
-# Enable some additional functionality if the cellpainting module is available:
+# Enable some additional functionality if the matplotlib and seaborn are available:
 try:
-    from cellpainting3 import tools as cpt
     import matplotlib.pyplot as plt
     import seaborn as sns
     import gc
 
-    CELLPAINTING = True
+    CHARTS = True
 except ImportError:
-    CELLPAINTING = False
+    CHARTS = False
 
 
 def rescale(mol, f=1.4):
@@ -294,7 +293,7 @@ def mol_grid(
     id_col="Compound_Id",
     size=IMG_GRID_SIZE,
     as_html=True,
-    cluster_profiles=False,
+    bar: Optional[list[str]] = None,
     svg=None,
     img_folder=None,
     **kwargs,
@@ -306,6 +305,7 @@ def mol_grid(
         interactive (bool)
         as_html: return a Jupyter HTML object, when possible, otherwise return a string.
         link_templ, link_col (str) (then interactive is false)
+        bar [Option[list[str]]: displays the listed columns as bar chart in the grid. Y-limits can be set with the `ylim` tuple.
     Returns:
         HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page."""
 
@@ -313,15 +313,14 @@ def mol_grid(
         svg = SVG
     assert isinstance(svg, bool)
 
-    if cluster_profiles:
+    if bar is not None:
         # Cluster profiles can only be shown when the Cell Painting module is available.
-        cluster_profiles = CELLPAINTING
-    if cluster_profiles:
-        cluster_names = [
-            x for x in cpt.get_func_cluster_names(prefix="Cluster_") if x in df.columns
-        ]
-        cluster_names_short = [x[8:] for x in cluster_names]
-        hide.extend(cluster_names)
+        if not CHARTS:
+            bar = None
+    if bar is not None:
+        assert isinstance(bar, list)
+        hide.extend(bar)
+        bar_names_max_len = max([len(x) for x in bar])
 
     if img_folder is not None:
         os.makedirs(img_folder, exist_ok=True)
@@ -338,6 +337,8 @@ def mol_grid(
         "hlsss", None
     )  # colname with Smiles (,-separated) for Atom highlighting
     truncate = kwargs.get("truncate", 12)
+    ylim = kwargs.get("ylim", None)
+
     df = df.copy()
     if mol_col not in df.keys():
         df = utils.add_mol_col(df, smiles_col=smiles_col)
@@ -382,7 +383,7 @@ def mol_grid(
         else:
             img_id = idx
 
-        if not mol:
+        if mol is None or mol is np.nan:
             cell = ["no structure"]
 
         else:
@@ -442,11 +443,14 @@ def mol_grid(
 
         mol_cells.extend(templ.td(cell, td_opt))
 
-        if cluster_profiles:
+        if bar is not None:
             plt.figure(figsize=(6, 6))
-            cl_sims = rec[cluster_names].values
-            chart = sns.barplot(cluster_names_short, cl_sims, color="#94caef")
-            plt.xticks(rotation=90)
+            bar_values = rec[bar].values
+            chart = sns.barplot(bar, bar_values, color="#94caef")
+            if bar_names_max_len > 1:
+                plt.xticks(rotation=90)
+            if ylim is not None:
+                plt.ylim(ylim)
             bf = b64_fig(chart)
             chart_tag = f"""<img width="{IMG_GRID_SIZE}" src="data:image/png;base64,{bf}" alt="Chart"/>"""
             chart_cells.extend(templ.td(chart_tag, td_opt))
@@ -489,7 +493,7 @@ def mol_grid(
             if guessed_id:
                 rows.extend(templ.tr(id_cells))
             rows.extend(templ.tr(mol_cells))
-            if cluster_profiles:
+            if bar is not None:
                 rows.extend(templ.tr(chart_cells))
 
             if len(props) > 0:
