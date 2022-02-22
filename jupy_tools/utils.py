@@ -674,7 +674,11 @@ def calc_from_smiles(
         mol = smiles_to_mol(smiles)
         if mol is np.nan:
             return np.nan
-        return func(mol)
+        try:
+            result = func(mol)
+            return result
+        except:
+            return np.nan
 
     shape1 = df.shape
     df = df.copy()
@@ -723,6 +727,7 @@ def inchi_from_smiles(
         inchi_col,
         Chem.inchi.MolToInchiKey,
         smiles_col=smiles_col,
+        filter_nans=False,
     )
     if filter_nans:
         df = df[df[inchi_col].notna()]
@@ -736,6 +741,10 @@ def murcko_from_smiles(
     df: pd.DataFrame, smiles_col="Smiles", murcko_col="Murcko_Smiles", filter_nans=True
 ) -> pd.DataFrame:
     """Generate Murcko scaffolds from Smiles.
+    Molecules without any rings do not have a Murcko scaffold,
+    their Murcko_Smiles column will set to NaN.
+    In addition to the Murcko_Smiles column, the Murcko_InChIKey column
+    is also generated.
 
     Parameters:
     ===========
@@ -754,20 +763,24 @@ def murcko_from_smiles(
         The dataframe with the Murcko scaffolds and the InChIKeys of the scaffolds.
     """
 
+    def _murcko(mol):
+        result = MurckoScaffold.MurckoScaffoldSmiles(mol=mol)
+        if result == "" or result is None:
+            return np.nan
+        else:
+            return result
+
     global INTERACTIVE
     interact_flag = INTERACTIVE
     shape1 = df.shape
     df = df.copy()
-    df = calc_from_smiles(
-        df,
-        murcko_col,
-        lambda x: MurckoScaffold.MurckoScaffoldSmiles(mol=x),
-        smiles_col=smiles_col,
-    )
     # Temporariliy turn off INTERACTIVE output to avoid printing the info multiple times
     INTERACTIVE = False
+    df = calc_from_smiles(
+        df, murcko_col, _murcko, smiles_col=smiles_col, filter_nans=False
+    )
     df = inchi_from_smiles(
-        df, smiles_col=murcko_col, inchi_col="Murcko_InChIKey", filter_nans=filter_nans
+        df, smiles_col=murcko_col, inchi_col="Murcko_InChIKey", filter_nans=False
     )
     INTERACTIVE = interact_flag  # restore previous value
     if filter_nans:
