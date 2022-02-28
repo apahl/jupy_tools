@@ -133,7 +133,11 @@ def remove_nans(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """Remove rows containing NANs in the `column`."""
     result = df[df[column].notna()]
     if INTERACTIVE:
-        info(result, "remove_nans", f"{len(df) - len(result):4d} rows removed.")
+        info(
+            result,
+            f"remove_nans {column[:16]}",
+            f"{len(df) - len(result):4d} rows removed.",
+        )
     return result
 
 
