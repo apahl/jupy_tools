@@ -135,7 +135,7 @@ def remove_nans(df: pd.DataFrame, column: str) -> pd.DataFrame:
     if INTERACTIVE:
         info(
             result,
-            f"remove_nans {column[:16]}",
+            f"remove_nans `{column[:16]}`",
             f"{len(df) - len(result):4d} rows removed.",
         )
     return result
