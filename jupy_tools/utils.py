@@ -12,7 +12,7 @@ import uuid
 import signal
 from contextlib import contextmanager
 
-from typing import List, Set, Callable, Union, Tuple
+from typing import Any, Callable, List, Set, Tuple, Union
 
 import pandas as pd
 from pandas.core.frame import DataFrame
@@ -57,6 +57,7 @@ molvs_t = TautomerCanonicalizer(max_tautomers=100)
 
 INTERACTIVE = True
 MIN_NUM_RECS_PROGRESS = 500
+INFO_WIDTH = 30
 
 
 def is_interactive_ipython():
@@ -96,7 +97,7 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
         keys = ", ".join(df.keys())
         if len(keys) < 80:
             keys = f"( {keys} )"
-    print(f"{fn:25s}: [ {shape[0]:6d} / {shape[1]:3d} ] {what}{keys}")
+    print(f"{fn:{INFO_WIDTH}s}: [ {shape[0]:6d} / {shape[1]:3d} ] {what}{keys}")
 
 
 def get_value(str_val):
@@ -129,15 +130,61 @@ def count_nans(df: pd.DataFrame, column: str) -> int:
     return result
 
 
-def remove_nans(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    """Remove rows containing NANs in the `column`."""
-    result = df[df[column].notna()]
-    if INTERACTIVE:
-        info(
-            result,
-            f"remove_nans `{column[:16]}`",
-            f"{len(df) - len(result):4d} rows removed.",
-        )
+def remove_nans(df: pd.DataFrame, column: Union[str, List[str]]) -> pd.DataFrame:
+    """Remove rows containing NANs in the `column`.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The DataFrame to be processed
+    column: Union[str, List[str]]
+        The column(s) in which the nans should be replaced.
+
+    Returns: A new DataFrame without the rows containing NANs.
+    """
+    result = df.copy()
+    if isinstance(column, str):
+        column = [column]
+    for col in column:
+        result = result[result[col].notna()]
+        if INTERACTIVE:
+            info(
+                result,
+                f"remove_nans `{col[:INFO_WIDTH-14]}`",
+                f"{len(df) - len(result):4d} rows removed.",
+            )
+    return result
+
+
+def replace_nans(
+    df: pd.DataFrame, column: Union[str, List[str]], value: Any
+) -> pd.DataFrame:
+    """Replace fields containing NANs in the `column` with `value`.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The DataFrame to be processed
+    column: Union[str, List[str]]
+        The column(s) in which the nans should be replaced.
+    value: Any
+        the value by which the nans should be replaced.
+
+    Returns: A new DataFrame where the NAN fields have been replaced by `value`.
+    """
+    result = df.copy()
+    if isinstance(column, str):
+        column = [column]
+    for col in column:
+        mask = result[col].isna()
+        num_nans = mask.sum()
+        result.loc[mask, col] = value
+        if INTERACTIVE:
+            info(
+                result,
+                f"replace_nans `{col[:INFO_WIDTH-15]}`",
+                f"{num_nans:4d} values replaced.",
+            )
     return result
 
 
