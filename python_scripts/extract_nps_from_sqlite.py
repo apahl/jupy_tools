@@ -15,6 +15,8 @@ Copy the result file to oracle-server with:
 
 """
 
+import sys
+
 import sqlite3
 import pandas as pd
 
@@ -22,8 +24,6 @@ from jupy_tools import utils as u
 from jupy_tools.deglyco import deglycosylate
 
 # from rdkit.Chem.Scaffolds import MurckoScaffold
-
-VERSION = 29
 
 
 def deglyco_smiles(smi):
@@ -46,6 +46,9 @@ where md.molregno = cr.molregno
   and cr.doc_id = d.doc_id
   and d.journal in ('J. Nat. Prod.', 'J Nat Prod');"""
 
+    print("Extracting Natural Products from ChEMBL.")
+    assert len(sys.argv == 2, "Usage: extract_nps_from_sqlite.py <chembl version>")
+    VERSION = sys.argv[1]
     print(f"Extracting Natural Product entries from ChEMBL {VERSION} (SQLite)...")
     conn = sqlite3.connect(f"./chembl_{VERSION}.db")
     df = pd.read_sql(query, conn)
@@ -54,7 +57,7 @@ where md.molregno = cr.molregno
     # df = pd.read_csv(f"chembl_{VERSION}_active_entries.tsv", sep="\t", low_memory=False)
     print(f"{df.shape[0]} NP entries extracted.")
     print("Merging Smiles from full nocanon data...")
-    df_mc = pd.read_csv(f"./chembl_{VERSION}_np_full_nocanon.tsv", sep="\t")
+    df_mc = pd.read_csv(f"./chembl_{VERSION}_full_nocanon.tsv", sep="\t")
     df = pd.merge(df, df_mc, how="inner", on="chembl_id")
     df = df.drop("Name", axis=1)
     print(f"{df.shape[0]} entries merged.")

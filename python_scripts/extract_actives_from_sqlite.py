@@ -15,12 +15,12 @@ Copy the result file to oracle-server with:
 
 """
 
+import sys
+
 import sqlite3
 import pandas as pd
 
 from rdkit.Chem.Scaffolds import MurckoScaffold
-
-VERSION = 29
 
 
 if __name__ == "__main__":
@@ -48,6 +48,9 @@ where act.molregno = md.molregno
   and td.target_type = 'SINGLE PROTEIN'
   and (act.data_validity_comment is Null  or act.data_validity_comment = 'Manually validated');"""
 
+    print("Extract active entries from ChEMBL.")
+    assert len(sys.argv == 2, "Usage: extract_nps_from_sqlite.py <chembl version>")
+    VERSION = sys.argv[1]
     print(f"Extracting active entries from ChEMBL {VERSION} (SQLite)...")
     conn = sqlite3.connect(f"./chembl_{VERSION}.db")
     df = pd.read_sql(query, conn)
