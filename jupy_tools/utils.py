@@ -57,7 +57,7 @@ molvs_t = TautomerCanonicalizer(max_tautomers=100)
 
 INTERACTIVE = True
 MIN_NUM_RECS_PROGRESS = 500
-INFO_WIDTH = 30
+INFO_WIDTH = 35
 
 
 def is_interactive_ipython():
@@ -89,6 +89,9 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
     df: the result DataFrame
     fn: the name of the function
     what: the result of the function"""
+    if not isinstance(df, pd.DataFrame):
+        lp(df, fn)
+        return
     if len(what) > 0:
         what = f"{what} "
     shape = df.shape
@@ -97,7 +100,7 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
         keys = ", ".join(df.keys())
         if len(keys) < 80:
             keys = f"( {keys} )"
-    print(f"{fn:{INFO_WIDTH}s}: [ {shape[0]:6d} / {shape[1]:3d} ] {what}{keys}")
+    print(f"{fn:{INFO_WIDTH}s}: [ {shape[0]:7d} / {shape[1]:3d} ] {what}{keys}")
 
 
 def get_value(str_val):
@@ -105,8 +108,9 @@ def get_value(str_val):
     if not str_val:
         return np.nan
     try:
-        val = float(str_val)
-        if "." not in str_val:
+        if "." in str_val:
+            val = float(str_val)
+        else:
             val = int(val)
     except ValueError:
         val = str_val
@@ -157,7 +161,7 @@ def remove_nans(df: pd.DataFrame, column: Union[str, List[str]]) -> pd.DataFrame
 
 
 def replace_nans(
-    df: pd.DataFrame, column: Union[str, List[str]], value: Any
+    df: pd.DataFrame, columns: Union[str, List[str]], value: Any
 ) -> pd.DataFrame:
     """Replace fields containing NANs in the `column` with `value`.
 
@@ -173,9 +177,9 @@ def replace_nans(
     Returns: A new DataFrame where the NAN fields have been replaced by `value`.
     """
     result = df.copy()
-    if isinstance(column, str):
-        column = [column]
-    for col in column:
+    if isinstance(columns, str):
+        columns = [columns]
+    for col in columns:
         mask = result[col].isna()
         num_nans = mask.sum()
         result.loc[mask, col] = value
@@ -963,7 +967,7 @@ def write_sdf(df: pd.DataFrame, output_sdf: str, smiles_col="Smiles"):
     writer.close()
 
 
-def lp(obj, label: str = None, lpad=50, rpad=10):
+def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
     """log-printing for different kind of objects"""
     if label is not None:
         label_str = label
@@ -1015,7 +1019,7 @@ def lp(obj, label: str = None, lpad=50, rpad=10):
         if num_nan_cols > 0:  # DF has nans
             has_nan_str = f"( NAN values in {num_nan_cols} col(s) )"
         print(
-            f"{label_str:{lpad}s}: {shape[0]:{rpad}d} / {shape[1]:{4}d} {key_str} {has_nan_str}"
+            f"{label_str:{lpad}s}:   {shape[0]:{rpad}d} / {shape[1]:{4}d} {key_str} {has_nan_str}"
         )
         return
     except (TypeError, AttributeError, IndexError):
@@ -1026,9 +1030,9 @@ def lp(obj, label: str = None, lpad=50, rpad=10):
         if label is None:
             label_str = "Number"
         if fval == obj:
-            print(f"{label_str:{lpad}s}: {int(obj):{rpad}d}")
+            print(f"{label_str:{lpad}s}:   {int(obj):{rpad}d}")
         else:
-            print(f"{label_str:{lpad}s}: {obj:{rpad+6}.5f}")
+            print(f"{label_str:{lpad}s}:   {obj:{rpad+6}.5f}")
         return
     except (ValueError, TypeError):
         # print("Exception")
@@ -1040,14 +1044,14 @@ def lp(obj, label: str = None, lpad=50, rpad=10):
             label_str = "Length"
         else:
             label_str = f"Length {label}"
-        print(f"{label_str:{lpad}s}: {length:{rpad}d}")
+        print(f"{label_str:{lpad}s}:   {length:{rpad}d}")
         return
     except (TypeError, AttributeError):
         pass
 
     if label is None:
         label_str = "Object"
-    print(f"{label_str:{lpad}s}: {obj}")
+    print(f"{label_str:{lpad}s}:   {obj}")
 
 
 def save_list(lst, fn="list.txt"):
