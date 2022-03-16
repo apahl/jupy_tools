@@ -49,7 +49,7 @@ where act.molregno = md.molregno
   and (act.data_validity_comment is Null  or act.data_validity_comment = 'Manually validated');"""
 
     print("Extract active entries from ChEMBL.")
-    assert len(sys.argv == 2, "Usage: extract_nps_from_sqlite.py <chembl version>")
+    assert len(sys.argv) == 2, "Usage: extract_nps_from_sqlite.py <chembl version>"
     VERSION = sys.argv[1]
     print(f"Extracting active entries from ChEMBL {VERSION} (SQLite)...")
     conn = sqlite3.connect(f"./chembl_{VERSION}.db")

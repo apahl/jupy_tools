@@ -18,8 +18,7 @@ import matplotlib.pyplot as plt
 
 import scipy.spatial.distance as dist
 
-MODULE_DIR = op.dirname(op.abspath(__file__))
-OUTPUT_DIR = op.join(MODULE_DIR, "output")
+OUTPUT_DIR = "../output"
 
 ACT_PROF_FEATURES = [
     "Median_Cells_AreaShape_Area",

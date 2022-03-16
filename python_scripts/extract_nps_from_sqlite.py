@@ -38,7 +38,7 @@ def deglyco_smiles(smi):
 
 if __name__ == "__main__":
     query = """
-select distinct(md.chembl_id) as Chembl_Id
+select distinct(md.chembl_id) as chembl_id
 from docs d,
      molecule_dictionary md,
      compound_records cr
@@ -47,7 +47,7 @@ where md.molregno = cr.molregno
   and d.journal in ('J. Nat. Prod.', 'J Nat Prod');"""
 
     print("Extracting Natural Products from ChEMBL.")
-    assert len(sys.argv == 2, "Usage: extract_nps_from_sqlite.py <chembl version>")
+    assert len(sys.argv) == 2, "Usage: extract_nps_from_sqlite.py <chembl version>"
     VERSION = sys.argv[1]
     print(f"Extracting Natural Product entries from ChEMBL {VERSION} (SQLite)...")
     conn = sqlite3.connect(f"./chembl_{VERSION}.db")

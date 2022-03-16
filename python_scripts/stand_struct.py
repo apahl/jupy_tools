@@ -282,8 +282,8 @@ def process(
                 ctr["Fail_NoMol"] += 1
                 continue
 
-            # "murcko" implies "rac"
-            if "rac" in out_type or "murcko" in out_type:
+            # Racemize all stereocenters
+            if "rac" in out_type:
                 mol = molvs_s.stereo_parent(mol)
             if mol is None:
                 ctr["Fail_NoMol"] += 1
@@ -419,15 +419,17 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
             "medchemrac",
             "fullmurcko",
             "medchemmurcko",
+            "fullracmurcko",
+            "medchemracmurcko",
         ],
         help=(
             "The output type. "
             "'full': Full dataset, only standardized; "
             "'fullrac': Like 'full', but with stereochemistry removed; "
-            "'fullmurcko': Like 'fullrac', structures are reduced to their Murcko scaffolds; "
+            "'fullmurcko', 'fullracmurcko: Like 'full' or 'fullrac', but structures are reduced to their Murcko scaffolds; "
             "'medchem': Dataset with MedChem filters applied, bounds for the number of heavy atoms can be optionally given; "
             "'medchemrac': Like 'medchem', but with stereochemistry removed; "
-            "'medchemmurcko': Like 'medchemrac', structures are reduced to their Murcko scaffolds; "
+            "'medchemmurcko', 'medchemracmurcko': Like 'medchem' or 'medchemrac', but structures are reduced to their Murcko scaffolds; "
             "(all filters, canonicalization and duplicate checks are applied after Murcko generation)."
         ),
     )
