@@ -333,10 +333,10 @@ def process(
                 with timeout(2):
                     try:
                         mol = molvs_t.canonicalize(mol)
+                        timed_out = False
                     except:
                         # in case of a canonicalization error, restore original mol
                         mol = mol_copy
-                    timed_out = False
                 if timed_out:
                     ctr[
                         "Timeout"
