@@ -8,7 +8,7 @@ Standardize Structure Files
 *Created on Tue Aug 31 2021 08:45  by A. Pahl*
 Standardize and filter SD files, e.g. the ChEMBL dataset.
 
-Molecules are excluded from the MPI calculation when they have either
+Molecules are excluded from the PMI calculation when they have either
   - more than one undefined stereocenter, or
   - one or more defined stereocenters and at least one undefined stereocenter
     (creating diastereomers)
@@ -22,7 +22,6 @@ import signal
 from contextlib import contextmanager
 
 from rdkit.Chem import AllChem as Chem
-from rdkit.Chem import rdMolDescriptors as rdMolDesc
 from rdkit import RDLogger
 
 from jupy_tools import pmi
@@ -209,17 +208,10 @@ def process(
             #   more than one undefined stereocenter or
             #   more than 0 defined stereocenters and at least one undefined stereocenter
             #     (creating diastereomers)
-            num_st_all = rdMolDesc.CalcNumAtomStereoCenters(mol)
-            num_st_undef = rdMolDesc.CalcNumUnspecifiedAtomStereoCenters(mol)
-            num_st_def = num_st_all - num_st_undef
-            if num_st_def > 0:
-                if num_st_undef > 0:
-                    ctr["UndefStereo"] += 1
-                    continue
-            else:
-                if num_st_undef > 1:
-                    ctr["UndefStereo"] += 1
-                    continue
+            _, _, is_diastereomer = pmi.get_stereo_counts(mol)
+            if is_diastereomer:
+                ctr["UndefStereo"] += 1
+                continue
             if first_mol:
                 first_mol = False
                 header = columns.copy()

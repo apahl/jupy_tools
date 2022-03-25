@@ -12,6 +12,31 @@ from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors as rdMolDesc
 
 
+def get_stereo_counts(mol) -> (int, int, bool):
+    """Count the number of specified and unspecified atom stereo centers.
+    Only chirality at carbons is considered.
+    Returns a tuple of (num_specified: int, num_specified: int, is_diastereomer: bool) counts.
+    A molecule is a potential diastereomer when it has either
+    - no specified stereo centers and more than one unspecified stereo center, or
+    - at least one specified stereo center and one or more unspecified stereo centers."""
+    num_spec = 0
+    num_unspec = 0
+    atoms = mol.GetAtoms()
+    chiraltags = Chem.FindMolChiralCenters(mol, force=True, includeUnassigned=True)
+    # example output [(1, '?'), (2, 'R'), (5, 'S'), (8, 'S')]
+    for tag in chiraltags:
+        if tag[1] == "R" or tag[1] == "S":
+            num_spec += 1
+        else:
+            if atoms[tag[0]].GetAtomicNum() == 6:
+                num_unspec += 1
+    if num_spec == 0 and num_unspec > 1:
+        return num_spec, num_unspec, True
+    if num_spec > 0 and num_unspec > 0:
+        return num_spec, num_unspec, True
+    return num_spec, num_unspec, False
+
+
 def gen_3d(mol: Chem.Mol, n_conformers: int) -> (Chem.Mol, List[int]):
     """
     Generate 3D coordinates for a molecule.
@@ -63,4 +88,4 @@ def calc_pmi(mol: Chem.Mol, n_conformers: int, avg=3) -> (float, float):
             pmi2_list.append(pmis[1] / pmis[2])
     if did_not_converge > 0:
         print(f"* {did_not_converge} minimizations did not converge.")
-    return np.median(pmi1_list), np.median(pmi2_list)
+    return round(np.median(pmi1_list), 3), round(np.median(pmi2_list), 3)
