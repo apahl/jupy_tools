@@ -352,9 +352,11 @@ def add_mol_col(df: pd.DataFrame, smiles_col="Smiles") -> pd.DataFrame:
     return df
 
 
-def drop_cols(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
-    """Remove the list of columns from the dataframe.
+def drop_cols(df: pd.DataFrame, cols: Union[str, List[str]]) -> pd.DataFrame:
+    """Remove the column or the list of columns from the dataframe.
     Listed columns that are not available in the dataframe are simply ignored."""
+    if not isinstance(cols, list):
+        cols = [cols]
     shape1 = df.shape
     df = df.copy()
     cols_to_remove = set(cols).intersection(set(df.keys()))
