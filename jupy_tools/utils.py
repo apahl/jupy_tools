@@ -6,6 +6,7 @@ Utilities for data calculation.
 
 import gzip
 import os.path as op
+from glob import glob
 import subprocess
 import tempfile
 import uuid
@@ -925,6 +926,30 @@ def read_tsv(input_tsv: str, sep="\t") -> pd.DataFrame:
     if INTERACTIVE:
         info(df, "read_tsv")
     return df
+
+
+def read_chunked_tsv(pattern: str, sep="\t") -> pd.DataFrame:
+    """
+    Read a list of chunked CSV files into one concatenated DataFrame.
+
+    Parameters
+    ==========
+    pattern: str
+        A glob pattern for the chunked CSV files.
+        Example: 'data/chunked/*.csv'
+    sep: str
+        The delimiter for the columns in the CSV files. Default: TAB.
+
+    Returns: pd.DataFrame with the concatenated data.
+    """
+    chunks = []
+    file_list = glob(pattern)
+    for f in file_list:
+        chunks.append(pd.read_csv(f, sep=sep))
+    result = pd.concat(chunks)
+    if INTERACTIVE:
+        info(result, "read_chunked_tsv")
+    return result
 
 
 def write(text, fn):
