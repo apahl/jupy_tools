@@ -738,17 +738,16 @@ def get_func_cluster_names(prefix="") -> Optional[List[str]]:
 
 
 @functools.lru_cache
-def get_func_cluster_parameters(cluster: str, include_well_id=True) -> pd.DataFrame:
-    """Extract the cluster parameters from the median profile files.
+def get_func_cluster_features(cluster: str, include_well_id=True) -> pd.DataFrame:
+    """Extract the cluster features from the median profile files.
 
     Returns:
         a DataFrame WITH THE (artificial) Well_Id of the cluster
-        AND the parameters (default).
-        Set `include_well_id=False` to get the parameters without the Well_Id.
+        AND the features (default).
+        Set `include_well_id=False` to get the features without the Well_Id.
 
     Raises:
-        ValueError: when the ClusterMaskDir is not set in the config
-        FileNotFoundError: when the cluster parameter file is not found."""
+        FileNotFoundError: when the cluster feature file is not found."""
     parm_file = op.join(OUTPUT_DIR, f"med_prof_{cluster}.tsv")
     try:
         cl_parms = pd.read_csv(parm_file, sep="\t")
@@ -770,8 +769,8 @@ def add_func_clusters(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         The dataframe with the functional cluster similarities added."""
 
-    def calc_sim(series, prof1, parameters):
-        prof2 = series[parameters].values.astype("float64")
+    def calc_sim(series, prof1, features):
+        prof2 = series[features].values.astype("float64")
         result = round(100 * profile_sim(prof1, prof2), 1)
         return result
 
