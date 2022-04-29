@@ -126,13 +126,24 @@ def fp_ecfc4_from_smiles(smi):
     return fp
 
 
-def count_nans(df: pd.DataFrame, column: str) -> int:
-    """Count rows containing NANs in the `column`."""
-    result = df[column].isna().sum()
-    if INTERACTIVE:
+def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) -> int:
+    """Count rows containing NANs in the `column`.
+    When no column is given, count all NANs."""
+    if columns is None:
+        columns = df.columns
+    elif isinstance(columns, str):
+        columns = [columns]
+    column_list = []
+    nan_counts = []
+    for col in columns:
+        column_list.append(col)
+        nan_counts.append(df[col].isna().sum())
+    if INTERACTIVE and len(columns) == 1:
         fn = "count_nans"
-        print(f"{fn:25s}: [ {result:6d}       ] rows with NAN values in col `{column}`")
-    return result
+        print(
+            f"{fn:25s}: [ {nan_counts[0]:6d}       ] rows with NAN values in col `{columns[0]}`"
+        )
+    return pd.DataFrame({"Column": column_list, "NANs": nan_counts})
 
 
 def remove_nans(df: pd.DataFrame, column: Union[str, List[str]]) -> pd.DataFrame:
