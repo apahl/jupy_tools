@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import uuid
 import signal
+import time
 from contextlib import contextmanager
 
 from typing import Any, Callable, List, Set, Tuple, Union
@@ -79,6 +80,14 @@ if NOTEBOOK:
         TQDM = True
     except ImportError:
         TQDM = False
+
+
+def timestamp(show=True):
+    """Print (show=True) or return (show=False) a timestamp string."""
+    if show:
+        print("Timestamp:", time.strftime("%d-%b-%Y %H:%M:%S"))
+    else:
+        return time.strftime("%d-%b-%Y %H:%M:%S")
 
 
 def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
