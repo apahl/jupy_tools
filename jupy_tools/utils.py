@@ -1178,9 +1178,46 @@ def filter(
         df_pass = df_pass.reset_index(drop=True)
         df_fail = df_fail.reset_index(drop=True)
     if INTERACTIVE:
-        info(df_pass, "filter_pass")
-        info(df_fail, "filter_fail")
+        info(df_pass, "filter: pass")
+        info(df_fail, "filter: fail")
     return df_pass, df_fail
+
+
+def inner_merge(
+    df_left: pd.DataFrame, df_right: pd.DataFrame, on: str
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Inner merge for two dataframes that also reports the entries from the left df that were not found in the right df.
+
+    Returns: two dataframes, the merged dataframe and missing entries from left df."""
+    df_result = df_left.merge(df_right, on=on, how="inner").reset_index(drop=True)
+    df_result_on = df_result[on].unique()
+    df_missing = df_left[~df_left[on].isin(df_result_on)].reset_index(drop=True)
+    if INTERACTIVE:
+        info(df_result, "merge_inner: result")
+        info(df_missing, "merge_inner: missing")
+    return df_result, df_missing
+
+
+def drop_duplicates(
+    df: pd.DataFrame, subset: Union[str, List[str]], reset_index=True
+) -> Tuple[pd.DataFrame, List[Any]]:
+    """Drops the duplicates from the given dataframe and returns it as well as the duplicates as list
+
+    Returns: dataframe without duplicates and a list of the duplicates.."""
+    df_pass = df.copy().drop_duplicates(subset=subset)
+    if reset_index:
+        df_pass = df_pass.reset_index(drop=True)
+    if isinstance(subset, str):
+        subset_list = [subset]
+    tmp = df[subset_list].copy()
+    tmp["CountXX"] = 1
+    tmp = tmp.groupby(by=subset).count().reset_index()
+    tmp = tmp[tmp["CountXX"] > 1].copy()
+    dupl_list = tmp[subset].values.tolist()
+    if INTERACTIVE:
+        info(df_pass, "drop_dupl: result")
+        info(dupl_list, "drop_dupl: dupl")
+    return df_pass, dupl_list
 
 
 def groupby(df_in, by=None, num_agg=["median", "mad", "count"], str_agg="unique"):
@@ -1285,11 +1322,15 @@ def pandas_info():
     """Adds the following extensions to the Pandas DataFrame:
     - `iquery`: same as the DF `query`, but prints info about the shape of the result.
     - `ifilter`
+    - `imerge`
+    - `idrop_duplicates`
 
 
-    See also: `filter` from this module, which returns both the passing and the failing dataframes."""
+    See also doc for: `filter`, `inner_merge` from this module."""
 
     DataFrame.ifilter = filter
+    DataFrame.imerge = inner_merge
+    DataFrame.idrop_duplicates = drop_duplicates
 
     def inner_query(
         df: pd.DataFrame, query: str, reset_index=True
