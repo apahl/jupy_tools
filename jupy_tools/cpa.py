@@ -4,7 +4,7 @@
 Helper functions for analysis of the Cell Painting Assay data.
 """
 
-import functools
+# import functools
 from glob import glob
 import os.path as op
 from typing import Iterable, List, Optional, Union
@@ -678,6 +678,7 @@ def find_similar(
     cutoff=75.0,
     max_num=5,
     features=ACT_PROF_FEATURES,
+    sort_by_similarity=True,
 ):
     """Filter the dataframe for activity profiles similar to the given one.
     `cutoff` gives the similarity threshold in percent, default is 75.
@@ -696,6 +697,9 @@ def find_similar(
         The maximum number of results to return.
     features: List[str]
         The features to use for the similarity calculation.
+    sort_by_similarity: bool
+        If True, the results are sorted by the similarity value, in descending order.
+
 
     Returns a Pandas DF with the most similar entries (similarity in percent) or None when no similars are found."""
 
@@ -718,12 +722,13 @@ def find_similar(
     result = result[result["Similarity"] >= cutoff]
     if len(result) == 0:
         return None
-    result = result.sort_values("Similarity", ascending=False).head(max_num)
+    if sort_by_similarity:
+        result = result.sort_values("Similarity", ascending=False)
+    result = result.head(max_num)
     result = result.round(decimals)
     return result
 
 
-@functools.lru_cache
 def get_func_cluster_names(prefix="") -> Optional[List[str]]:
     """Extract the cluster names from the median profile file names.
     If a `prefix` is given, it will be put in front of the names.
@@ -737,7 +742,6 @@ def get_func_cluster_names(prefix="") -> Optional[List[str]]:
     return clusters
 
 
-@functools.lru_cache
 def get_func_cluster_features(cluster: str, include_well_id=True) -> pd.DataFrame:
     """Extract the cluster features from the median profile files.
 
@@ -991,7 +995,7 @@ def heat_mpl(
                 sim = profile_sim(prof_ref, fp) * 100
                 ylabel_bs = "{:3.0f} |  ".format(sim)
         if show_ind:
-            ylabel_ind = "{:3.0f} |  ".format(rec["Activity"])
+            ylabel_ind = "{:3.0f} |  ".format(rec["Induction"])
 
         ylabel = ylabel_templ.format(ylabel_bs, ylabel_ind, rec[id_prop])
         y_labels.append(ylabel)
