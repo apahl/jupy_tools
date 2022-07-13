@@ -179,14 +179,14 @@ class MolImage:
             hl_atoms = {}
 
         add_coords(self.mol)
-        if svg:
+        if self.svg:
             d2d = rdMolDraw2D.MolDraw2DSVG(size, size)
         else:
             d2d = rdMolDraw2D.MolDraw2DCairo(size, size)
         d2d.DrawMoleculeWithHighlights(self.mol, "", hl_atoms, {}, {}, {})
         d2d.FinishDrawing()
         img = d2d.GetDrawingText()
-        if svg:
+        if self.svg:
             # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
             img_list = [
                 line for line in img.splitlines()[1:] if not line.startswith("<rect")
@@ -212,7 +212,7 @@ class MolImage:
 
         if options is None:
             options = ""
-        if svg:
+        if self.svg:
             img = bytes(self.txt, encoding="iso-8859-1")
             img = b64_mol(img)
             tag = """<img {} src="data:image/svg+xml;base64,{}" alt="Mol"/>"""
@@ -429,7 +429,11 @@ def mol_grid(
             cell = mol_img.tag
 
             if link_col is not None:
-                link = link_templ.format(rec[link_col])
+                if isinstance(link_col, str):
+                    fields = [link_col]
+                else:
+                    fields = [rec[x] for x in link_col]
+                link = link_templ.format(*fields)
                 a_opt = {"href": link}
                 cell = templ.a(cell, a_opt)
 

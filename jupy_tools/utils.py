@@ -38,6 +38,7 @@ except ImportError:
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import DataStructs
+from rdkit.Chem import rdqueries
 import rdkit.Chem.Descriptors as Desc
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
@@ -726,6 +727,37 @@ def filter_smiles(
         shape2 = df.shape
         info(df, "filter_smiles", f"{shape1[0] - shape2[0]:4d} rows removed.")
     return df
+
+
+def fr_stereo(mol, spec_only=False) -> float:
+    """Calculate the fraction of stereogenic carbons.
+    This is defined as number of carbons with defined and undefined stereochemistry,
+    divided by the total number of carbons.
+    With spec_only=True, only the number of carbons with defined stereochemistry
+    is considered.
+
+    Returns:
+    ========
+    The fraction of stereogenic carbons [0..1]."""
+    num_spec = 0
+    num_unspec = 0
+    q = rdqueries.AtomNumEqualsQueryAtom(6)
+    num_carbons = len(mol.GetAtomsMatchingQuery(q))
+    if num_carbons == 0:
+        return 0.0
+    atoms = mol.GetAtoms()
+    chiraltags = Chem.FindMolChiralCenters(mol, force=True, includeUnassigned=True)
+    # example output [(1, '?'), (2, 'R'), (5, 'S'), (8, 'S')]
+    for tag in chiraltags:
+        # Only consider carbon chirality:
+        if atoms[tag[0]].GetAtomicNum() != 6:
+            continue
+        if tag[1] == "R" or tag[1] == "S":
+            num_spec += 1
+        else:
+            if not spec_only:
+                num_unspec += 1
+    return (num_spec + num_unspec) / num_carbons
 
 
 def calc_from_smiles(
