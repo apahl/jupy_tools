@@ -731,14 +731,14 @@ def filter_smiles(
 
 def fr_stereo(mol, spec_only=False) -> float:
     """Calculate the fraction of stereogenic carbons.
-    This is defined as number of carbons with defined and undefined stereochemistry,
+    This is defined as number of carbons with defined or undefined stereochemistry,
     divided by the total number of carbons.
-    With spec_only=True, only the number of carbons with defined stereochemistry
+    With `spec_only=True`, only the number of carbons with defined stereochemistry
     is considered.
 
     Returns:
     ========
-    The fraction of stereogenic carbons [0..1]."""
+    The fraction of stereogenic carbons [0..1], rounded to 3 digits after the decimal."""
     num_spec = 0
     num_unspec = 0
     q = rdqueries.AtomNumEqualsQueryAtom(6)
@@ -757,7 +757,7 @@ def fr_stereo(mol, spec_only=False) -> float:
         else:
             if not spec_only:
                 num_unspec += 1
-    return (num_spec + num_unspec) / num_carbons
+    return round((num_spec + num_unspec) / num_carbons, 3)
 
 
 def calc_from_smiles(

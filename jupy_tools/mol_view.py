@@ -243,6 +243,29 @@ def write(text, fn):
 #     return pd.Series(mol_img_tag(mol))
 
 
+def add_image_tag(df, col, size=300, svg=None, options=None):
+    """
+    Add an image tag to a dataframe column.
+    The image tag can be used to display the molecule in a web page.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Dataframe containing the molecules.
+    col : str
+        Name of the column containing the images.
+    size : int
+        Size of the image in pixels (default=300).
+    svg : bool or None
+        If True, the image is saved as SVG. Otherwise, it is saved as PNG.
+        If None, the module default is used.
+    options : str or None
+        Additional HTML options for the drawing.
+    """
+    df = utils.calc_from_smiles(df, col, lambda x: MolImage(x, size, svg, options).tag)
+    return df
+
+
 def _apply_link(input, link, ln_title="Link"):
     """input[0]: mol_img_tag
     input[1]: link_col value"""
