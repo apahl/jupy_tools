@@ -93,3 +93,10 @@ def scatter(
     plot_styles["color"] = colorby
     opts = {"Scatter": {"plot": plot_options, "style": plot_styles}}
     return scatter.opts(opts)
+
+
+def save(plot, filename):
+    """Save a plot to a file.
+    This is just a convenience function, so that the calling code
+    does not have to import holoviews."""
+    hv.save(plot, filename)
