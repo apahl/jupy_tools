@@ -229,13 +229,13 @@ def process(
             reader = sdf_supplier(file_obj)
         elif "csv" in f:
             if f.endswith(".gz"):
-                file_obj = gzip.open(f, mode="rb")
+                file_obj = gzip.open(f, mode="rt")
             else:
                 file_obj = open(f, "r")
             reader = csv_supplier(file_obj, dialect="excel")
         elif "tsv" in f:
             if f.endswith(".gz"):
-                file_obj = gzip.open(f, mode="rb")
+                file_obj = gzip.open(f, mode="rt")
             else:
                 file_obj = open(f, "r")
             reader = csv_supplier(file_obj, dialect="excel-tab")
