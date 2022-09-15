@@ -89,17 +89,23 @@ class MeasureRuntime:
     def __init__(self):
         self.start = time.time()
 
-    def elapsed(self, show=True):
-        """Print (show=True) or return (show=False, in seconds) a timestamp for the runtime since `time_start`.
-        `time_start` has to be defined at the start of the measurement with `time_start = time.time()`."""
-        time_run = time.time() - self.start
+    def elapsed(self, show=True, msg="Runtime"):
+        """Print (show=True) or return (show=False, in seconds) a timestamp for the runtime since."""
+        run_time = time.time() - self.start
         if show:
-            if time_run / 60 < 300:
-                print("Runtime: {:.2f} minutes".format(time_run / 60))
-            else:
-                print("Runtime: {:.2f} hours".format(time_run / 3600))
+            time_unit = "s"
+            if run_time > 120:
+                run_time /= 60
+                time_unit = "min"
+                if run_time > 300:
+                    run_time /= 60
+                    time_unit = "h"
+                    if run_time > 96:
+                        run_time /= 24
+                        time_unit = "d"
+            print(f"{msg}: {run_time:.1f} {time_unit}")
         else:
-            return time_run
+            return run_time
 
 
 def timestamp(show=True):
