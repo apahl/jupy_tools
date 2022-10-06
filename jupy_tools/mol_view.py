@@ -359,7 +359,7 @@ def mol_grid(
     hlsss = kwargs.get(
         "hlsss", None
     )  # colname with Smiles (,-separated) for Atom highlighting
-    truncate = kwargs.get("truncate", 12)
+    truncate = kwargs.get("truncate", 20)
     ylim = kwargs.get("ylim", None)
 
     df = df.copy()
