@@ -181,7 +181,9 @@ def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) ->
     return pd.DataFrame({"Column": column_list, "NANs": nan_counts})
 
 
-def remove_nans(df: pd.DataFrame, column: Union[str, List[str]]) -> pd.DataFrame:
+def remove_nans(
+    df: pd.DataFrame, column: Union[str, List[str]], reset_index=True
+) -> pd.DataFrame:
     """Remove rows containing NANs in the `column`.
 
     Parameters:
@@ -204,6 +206,8 @@ def remove_nans(df: pd.DataFrame, column: Union[str, List[str]]) -> pd.DataFrame
                 f"remove_nans `{col[:INFO_WIDTH-14]}`",
                 f"{len(df) - len(result):4d} rows removed.",
             )
+    if reset_index:
+        result = result.reset_index(drop=True)
     return result
 
 
