@@ -23,18 +23,6 @@ import numpy as np
 
 from multiprocessing import Pool
 
-try:
-    from tqdm.notebook import tqdm
-
-    tqdm.pandas()
-    TQDM = True
-except ImportError:
-    TQDM = False
-
-    def tqdm(x):
-        return x
-
-
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import DataStructs
@@ -76,6 +64,14 @@ NOTEBOOK = is_interactive_ipython()
 if NOTEBOOK:
     try:
         from tqdm.notebook import tqdm
+
+        tqdm.pandas()
+        TQDM = True
+    except ImportError:
+        TQDM = False
+else:
+    try:
+        from tqdm import tqdm
 
         tqdm.pandas()
         TQDM = True
