@@ -130,6 +130,9 @@ def has_isotope(mol: Mol) -> bool:
 def csv_supplier(fo, dialect):
     reader = csv.DictReader(fo, dialect=dialect)
     for row in reader:
+        if len(row["Smiles"]) == 0:
+            yield {"Mol": None}
+            continue
         mol = smiles_to_mol(row["Smiles"])
         if mol is None:
             yield {"Mol": None}
