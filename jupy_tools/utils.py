@@ -1050,23 +1050,30 @@ def write_tsv(df: pd.DataFrame, output_tsv: str, sep="\t"):
     df.to_csv(output_tsv, sep=sep, index=False)
 
 
-def write_sdf(df: pd.DataFrame, output_sdf: str, smiles_col="Smiles"):
+def write_sdf(
+    df: pd.DataFrame, output_sdf: str, smiles_col="Smiles", keep_smiles=False
+):
     """Save the dataframe as an SD file. The molecules are generated from the `smiles_col`.
     Failed molecules are written as NoStructs ("*")."""
     writer = Chem.SDWriter(output_sdf)
     fields = []
     for f in df.keys():
-        if f != smiles_col and f != "Mol":
-            fields.append(f)
+        # if (f != smiles_col) and f != "Mol":
+        if f == smiles_col and not keep_smiles:
+            continue
+        if f == "Mol":
+            continue
+        fields.append(f)
     for _, rec in df.iterrows():
         mol = smiles_to_mol(rec[smiles_col])
         if mol is np.nan:
             mol = smiles_to_mol("*")
         for f in fields:
-            if f in rec and rec[f]:
-                mol.SetProp(f, str(rec[f]))
-            else:
-                mol.SetProp(f, "")
+            # if f in rec and rec[f]:
+            #     mol.SetProp(f, str(rec[f]))
+            # else:
+            #     mol.SetProp(f, "")
+            mol.SetProp(f, str(rec.get(f, "")))
         writer.write(mol)
     writer.close()
 
