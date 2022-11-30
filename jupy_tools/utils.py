@@ -143,7 +143,7 @@ def get_value(str_val):
         if "." in str_val:
             val = float(str_val)
         else:
-            val = int(val)
+            val = int(str_val)
     except ValueError:
         val = str_val
     return val
