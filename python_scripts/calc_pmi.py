@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-###########################
-Standardize Structure Files
-###########################
+####################
+Calculate PMI values
+####################
 
 *Created on Tue Aug 31 2021 08:45  by A. Pahl*
-Standardize and filter SD files, e.g. the ChEMBL dataset.
 
 Molecules are excluded from the PMI calculation when they have either
   - more than one undefined stereocenter, or

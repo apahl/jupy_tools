@@ -67,7 +67,7 @@ def calc_pmi(mol: Chem.Mol, n_conformers: int, avg=3) -> (float, float):
     Conformers that did not converge in the optimization are skipped.
 
     Returns:
-        PMI1, PMI2 [float]: the PMI values for the molecule. Both values are in the rantge (0, 1)."""
+        PMI1, PMI2 [float]: the PMI values for the molecule. PMI1 is in the range (0, 1), PMI2 in range (0.5, 1)."""
     did_not_converge = 0
     pmi1_list = []
     pmi2_list = []

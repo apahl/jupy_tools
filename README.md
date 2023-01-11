@@ -33,9 +33,11 @@ mv.mol_grid(df)
 
 # Python Scripts
 * [stand_struct.py](python_scripts/stand_struct.py): A Python script for standardizing structure files. The input can be either SD files OR CSV or TSV files which contain the structures as `Smiles`. 
-The output is always a TSV file, various options are available, please have a look at the help in the file. (apahl; Python script)
+The output is always a TSV file, various options are available, please have a look at the help in the file.
+* [calc_pmi.py](python_scripts/calc_pmi.py): Script for calculating PMI values.
+* [extract_nps_from_sqlite.py](python_scripts/extract_nps_from_sqlite.py): Script to extract the Natural Products from ChEMBL. Both the SQLite db and the standardized ChEMBL (using `stand_struct.py`) data are required to be available in the same folder where this script is run. Run with `extract_nps_from_sqlite.py <ChEMBL_version>`.
 
-## Usage
+### Usage
 
 ```
 $ stand_struct --help

@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-##################################################
-Extract Active Entries from ChEMBL SQLite Database
-##################################################
+####################################################
+Extract Natural Products from ChEMBL SQLite Database
+####################################################
 
 *Created on Tue Feb 02, 2022 by A. Pahl*
 
-Extract active molecule entries from the SQLite version of the ChEMBL database.
-
-Copy the result file to oracle-server with:
-
-    $ scp chembl_29_active_entries_with_smiles.tsv pahl@oracle-server:/mnt/data/PipelinePilot-data/public/users/pahl/chembl/
-
-"""
+Extract Natural Products from the SQLite version of the ChEMBL database.
+Both the SQLite db and the standardized ChEMBL (using `stand_struct.py`) data are required to be available in the same folder where this script is run. Run with `extract_nps_from_sqlite.py <ChEMBL_version>`."""
 
 import sys
 
