@@ -409,7 +409,6 @@ table {
   border-collapse:collapse;
   border-width:thin;
   border-style:solid;
-  //border-color:black;
   border: none;
   background-color: #FFFFFF;
   text-align: left;
