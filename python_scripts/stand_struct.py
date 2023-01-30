@@ -224,19 +224,19 @@ def process(
 
     for f in fn:
         do_close = True
-        if "sd" in f:
+        if ".sd" in f:
             if f.endswith(".gz"):
                 file_obj = gzip.open(f, mode="rb")
             else:
                 file_obj = open(f, "rb")
             reader = sdf_supplier(file_obj)
-        elif "csv" in f:
+        elif ".csv" in f:
             if f.endswith(".gz"):
                 file_obj = gzip.open(f, mode="rt")
             else:
                 file_obj = open(f, "r")
             reader = csv_supplier(file_obj, dialect="excel")
-        elif "tsv" in f:
+        elif ".tsv" in f:
             if f.endswith(".gz"):
                 file_obj = gzip.open(f, mode="rt")
             else:

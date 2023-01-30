@@ -999,7 +999,7 @@ def read_tsv(input_tsv: str, sep="\t") -> pd.DataFrame:
     The parsed tsv as Pandas DataFrame.
     """
     input_tsv = input_tsv.replace("file://", "")
-    df = pd.read_csv(input_tsv, sep=sep)
+    df = pd.read_csv(input_tsv, sep=sep, low_memory=False)
     if INTERACTIVE:
         info(df, "read_tsv")
     return df
