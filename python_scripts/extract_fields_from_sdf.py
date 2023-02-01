@@ -14,6 +14,9 @@ import sys
 import os.path as op
 
 
+MAX_LENGTH = 1000
+
+
 def extract(fn, fields):
     base_fn = op.splitext(fn)[0]
     result_fn = base_fn + ".tsv"
@@ -28,7 +31,7 @@ def extract(fn, fields):
                 line = line.strip()
 
                 if add_value:
-                    values.append(line)
+                    values.append(line[:MAX_LENGTH])
                     add_value = False
                     continue
 
@@ -59,6 +62,7 @@ if __name__ == "__main__":
         print(__doc__)
         sys.exit(1)
 
+    print(f"Processed max field length: {MAX_LENGTH}.")
     fn = sys.argv[1]
     fields = sys.argv[2].split(",")
     extract(fn, fields)

@@ -149,7 +149,7 @@ def csv_supplier(fo, dialect):
 def sdf_supplier(fo):
     reader = Chem.ForwardSDMolSupplier(fo)
     for mol in reader:
-        if mol is None:
+        if mol is None or mol.GetNumAtoms() == 0:
             yield {"Mol": None}
             continue
         d = {}
@@ -224,26 +224,35 @@ def process(
 
     for f in fn:
         do_close = True
+        file_type = ""
+        mode = ""
         if ".sd" in f:
+            file_type = "SDF"
             if f.endswith(".gz"):
+                mode = " (gzipped)"
                 file_obj = gzip.open(f, mode="rb")
             else:
                 file_obj = open(f, "rb")
             reader = sdf_supplier(file_obj)
         elif ".csv" in f:
+            file_type = "CSV"
             if f.endswith(".gz"):
+                mode = " (gzipped)"
                 file_obj = gzip.open(f, mode="rt")
             else:
                 file_obj = open(f, "r")
             reader = csv_supplier(file_obj, dialect="excel")
         elif ".tsv" in f:
+            file_type = "TSV"
             if f.endswith(".gz"):
+                mode = " (gzipped)"
                 file_obj = gzip.open(f, mode="rt")
             else:
                 file_obj = open(f, "r")
             reader = csv_supplier(file_obj, dialect="excel-tab")
         else:
             raise ValueError(f"Unknown input file format: {f}")
+        print(f"Detected file type: {file_type}{mode}.")
 
         for rec in reader:
             ctr["In"] += 1

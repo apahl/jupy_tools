@@ -23,28 +23,34 @@ import numpy as np
 
 from multiprocessing import Pool
 
-from rdkit.Chem import AllChem as Chem
-from rdkit.Chem import Mol
-from rdkit.Chem import DataStructs
-from rdkit.Chem import rdqueries
-import rdkit.Chem.Descriptors as Desc
-from rdkit.Chem.Scaffolds import MurckoScaffold
+try:
+    from rdkit.Chem import AllChem as Chem
+    from rdkit.Chem import Mol
+    from rdkit.Chem import DataStructs
+    from rdkit.Chem import rdqueries
+    import rdkit.Chem.Descriptors as Desc
+    from rdkit.Chem.Scaffolds import MurckoScaffold
 
-# from rdkit.Chem.MolStandardize import rdMolStandardize
-# from rdkit.Chem.MolStandardize.validate import Validator
-from rdkit.Chem.MolStandardize.charge import Uncharger
-from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
-from rdkit.Chem.MolStandardize.standardize import Standardizer
-from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
-from rdkit import rdBase
+    # from rdkit.Chem.MolStandardize import rdMolStandardize
+    # from rdkit.Chem.MolStandardize.validate import Validator
+    from rdkit.Chem.MolStandardize.charge import Uncharger
+    from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
+    from rdkit.Chem.MolStandardize.standardize import Standardizer
+    from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
+    from rdkit import rdBase
 
-rdBase.DisableLog("rdApp.info")
-# rdBase.DisableLog("rdApp.warn")
+    rdBase.DisableLog("rdApp.info")
+    # rdBase.DisableLog("rdApp.warn")
 
-molvs_s = Standardizer()
-molvs_l = LargestFragmentChooser()
-molvs_u = Uncharger()
-molvs_t = TautomerCanonicalizer(max_tautomers=100)
+    molvs_s = Standardizer()
+    molvs_l = LargestFragmentChooser()
+    molvs_u = Uncharger()
+    molvs_t = TautomerCanonicalizer(max_tautomers=100)
+    RDKIT = True
+
+except ImportError:
+    RDKIT = False
+    print("RDKit not installed.")
 
 INTERACTIVE = True
 MIN_NUM_RECS_PROGRESS = 500
@@ -237,6 +243,41 @@ def replace_nans(
                 f"{num_nans:4d} values replaced.",
             )
     return result
+
+
+def reorder_list(lst: List[Any], take: Union[List[Any], Any], front=True) -> List[Any]:
+    """Reorder the given list `lst`, so that the elements in `take` are at the front (front=True)
+    or at the end (front=False) of the list. The order of the elements in `take` will be preserved.
+    If `take` contains elements that are not in `lst`, a ValueError will be raised.
+    Returns: the reordered list."""
+    if not isinstance(take, list):
+        take = [take]
+    for el in take:
+        if el in lst:
+            lst.remove(el)
+        else:
+            raise ValueError(f"Element `{el}` not in list")
+    if front:
+        result = take + lst
+    else:
+        result = lst + take
+    return result
+
+
+def bring_to_front(df: pd.DataFrame, columns: Union[str, List[str]]) -> pd.DataFrame:
+    """Bring the column(s) `columns` to the front of the DataFrame. `columns` can be a single column
+    or a list of columns. The order of the columns in `columns` will be preserved. If `columns` contains
+    names that are not present in the DataFrame, a ValueError will be raised."""
+    if isinstance(columns, str):
+        columns = [columns]
+    cols = df.columns.tolist()
+    for key in columns:
+        if key in cols:
+            cols.remove(key)
+        else:
+            raise ValueError(f"Column `{key}` not in DataFrame")
+    cols = [key] + cols
+    return df[cols]
 
 
 def read_sdf(
