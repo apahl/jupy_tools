@@ -804,7 +804,8 @@ def fr_stereo(mol, spec_only=False) -> float:
 
     Returns:
     ========
-    The fraction of stereogenic carbons [0..1], rounded to 3 digits after the decimal."""
+    The fraction of stereogenic carbons [0..1], rounded to 3 digits after the decimal.
+    """
     num_spec = 0
     num_unspec = 0
     q = rdqueries.AtomNumEqualsQueryAtom(6)
@@ -1066,7 +1067,7 @@ def read_chunked_tsv(pattern: str, sep="\t") -> pd.DataFrame:
         chunks.append(pd.read_csv(f, sep=sep))
     result = pd.concat(chunks)
     if INTERACTIVE:
-        info(result, "read_chunked_tsv")
+        info(result, f"read_chunked_tsv ({len(file_list)})")
     return result
 
 
