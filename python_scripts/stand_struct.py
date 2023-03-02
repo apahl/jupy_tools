@@ -175,6 +175,7 @@ def process(
     min_heavy_atoms: int,
     max_heavy_atoms: int,
     keep_dupl: bool,
+    deglyco: bool,
     verbose: bool,
     every_n: int,
 ):
@@ -184,6 +185,9 @@ def process(
     molvs_u = Uncharger()
     molvs_t = TautomerCanonicalizer(max_tautomers=100)
 
+    deglyco_str = ""
+    if deglyco:
+        deglyco_str = "_deglyco"
     canon_str = ""
     if not canon:
         canon_str = "_nocanon"
@@ -203,14 +207,26 @@ def process(
     else:
         columns = set()
     header = []
-    ctr = {x: 0 for x in ["In", "Out", "Fail_NoMol", "Duplicates", "Filter", "Timeout"]}
+    if deglyco:
+        ctr_columns = [
+            "In",
+            "Out",
+            "Fail_NoMol",
+            "Deglyco",
+            "Duplicates",
+            "Filter",
+            "Timeout",
+        ]
+    else:
+        ctr_columns = ["In", "Out", "Fail_NoMol", "Duplicates", "Filter", "Timeout"]
+    ctr = {x: 0 for x in ctr_columns}
     first_mol = True
     sd_props = set()
     inchi_keys = set()
     fn = fn.split(",")  # allow comma separated list of files
     first_dot = fn[0].find(".")
     fn_base = fn[0][:first_dot]
-    out_fn = f"{fn_base}_{out_type}{canon_str}{dupl_str}{min_ha_str}{max_ha_str}.tsv"
+    out_fn = f"{fn_base}_{out_type}{deglyco_str}{canon_str}{dupl_str}{min_ha_str}{max_ha_str}.tsv"
     outfile = open(out_fn, "w")
     # Initialize reader for the correct input type
 
@@ -301,6 +317,15 @@ def process(
                 ctr["Fail_NoMol"] += 1
                 continue
 
+            if deglyco:
+                num_atoms = mol.GetNumAtoms()
+                mol = deglycosylate(mol)
+                if mol is None:
+                    ctr["Fail_NoMol"] += 1
+                    continue
+                if mol.GetNumAtoms() < num_atoms:
+                    ctr["Deglyco"] += 1
+
             if "murcko" in out_type:
                 mol = MurckoScaffold.GetScaffoldForMol(mol)
                 if mol is None:
@@ -381,20 +406,33 @@ def process(
             outfile.write("\t".join(line) + "\n")
 
             if ctr["In"] % every_n == 0:
-                print(
-                    f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  "
-                    f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
-                    end=end_char,
-                )
+                if deglyco:
+                    print(
+                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  Deglyco: {ctr['Deglyco']:6d}  "
+                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
+                        end=end_char,
+                    )
+                else:
+                    print(
+                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  "
+                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
+                        end=end_char,
+                    )
                 sys.stdout.flush()
 
         if do_close:
             file_obj.close()
     outfile.close()
-    print(
-        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  "
-        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done."
-    )
+    if deglyco:
+        print(
+            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  Deglyco: {ctr['Deglyco']:6d}  "
+            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
+        )
+    else:
+        print(
+            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  "
+            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
+        )
     print("")
 
 
@@ -479,12 +517,23 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
         help="Show info every `N` records (default: 1000).",
     )
     parser.add_argument(
+        "--deglyco",
+        action="store_true",
+        help="deglycosylate structures. Requires jupy_tools.",
+    )
+    parser.add_argument(
         "-v",
         action="store_true",
         help="Turn on verbose status output.",
     )
     args = parser.parse_args()
     print(args)
+    if args.deglyco:
+        try:
+            from jupy_tools.deglyco import deglycosylate
+        except:
+            print("deglycosylate() not found, please install jupy_tools.")
+            sys.exit(1)
     process(
         args.in_file,
         args.output_type,
@@ -493,6 +542,7 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
         args.min_heavy_atoms,
         args.max_heavy_atoms,
         args.keep_duplicates,
+        args.deglyco,
         args.v,
         args.n,
     )
