@@ -213,6 +213,7 @@ def process(
             "Out",
             "Fail_NoMol",
             "Deglyco",
+            "Fail_Deglyco",
             "Duplicates",
             "Filter",
             "Timeout",
@@ -318,11 +319,18 @@ def process(
                 continue
 
             if deglyco:
+                # Deglycosylation should not lead to failed mols.
+                # In case of error, the original mol is kept.
+                mol_copy = deepcopy(mol)
                 num_atoms = mol.GetNumAtoms()
-                mol = deglycosylate(mol)
+                try:
+                    mol = deglycosylate(mol)
+                except ValueError:
+                    ctr["Fail_Deglyco"] += 1
+                    mol = mol_copy
                 if mol is None:
-                    ctr["Fail_NoMol"] += 1
-                    continue
+                    ctr["Fail_Deglyco"] += 1
+                    mol = mol_copy
                 if mol.GetNumAtoms() < num_atoms:
                     ctr["Deglyco"] += 1
 
@@ -408,13 +416,13 @@ def process(
             if ctr["In"] % every_n == 0:
                 if deglyco:
                     print(
-                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  Deglyco: {ctr['Deglyco']:6d}  "
+                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
                         f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
                         end=end_char,
                     )
                 else:
                     print(
-                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  "
+                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
                         f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
                         end=end_char,
                     )
@@ -425,12 +433,12 @@ def process(
     outfile.close()
     if deglyco:
         print(
-            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  Deglyco: {ctr['Deglyco']:6d}  "
+            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
             f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
         )
     else:
         print(
-            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:6d}  "
+            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
             f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
         )
     print("")
@@ -447,6 +455,7 @@ and structure canonicalization will be performed (can be turned off with the `--
 where a timeout is enforced on the canonicalization if it takes longer than 2 seconds per structure.
 Timed-out structures WILL NOT BE REMOVED, they are kept in their state before canonicalization.
 Omitting structure canonicalization drastically improves the performance.
+Also, structures that fail the deglycosylation step WILL NOT BE REMOVED and the original structure is kept.
 The output will be a tab-separated text file with SMILES.
 
 Example:
