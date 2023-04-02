@@ -330,7 +330,8 @@ def mol_grid(
         link_templ, link_col (str) (then interactive is false)
         bar [Option[list[str]]: displays the listed columns as bar chart in the grid. Y-limits can be set with the `ylim` tuple.
     Returns:
-        HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page."""
+        HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page.
+    """
 
     if svg is None:
         svg = SVG
@@ -421,7 +422,6 @@ def mol_grid(
                     "onclick": "toggleCpd('{}')".format(id_prop_val),
                 }
             elif link_col is not None:
-
                 img_opt = {"title": "Click to open link"}
                 #          "onclick": "location.href='{}';".format(link)}
                 # '<a target="_blank" href="{}" title="{}">{}</a>'
