@@ -9,6 +9,7 @@ Standardize Structure Files
 
 Standardize and filter SD files, e.g. the ChEMBL dataset."""
 
+import os
 import sys
 import gzip
 import csv
@@ -16,6 +17,9 @@ from copy import deepcopy
 import argparse
 import signal
 from contextlib import contextmanager
+import subprocess
+
+import pandas as pd
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Mol
@@ -31,6 +35,7 @@ from rdkit import RDLogger
 
 LOG = RDLogger.logger()
 LOG.setLevel(RDLogger.CRITICAL)
+DEBUG = False
 
 
 # Timeout code is taken from José's NPFC project:
@@ -170,7 +175,8 @@ def sdf_supplier(fo):
 def process(
     fn: str,
     out_type: str,
-    canon: bool,
+    canon: str,
+    idcol: str,
     columns: str,  # comma separated list of columns to keep
     min_heavy_atoms: int,
     max_heavy_atoms: int,
@@ -179,6 +185,12 @@ def process(
     verbose: bool,
     every_n: int,
 ):
+    canon = canon.lower()
+    assert canon in {
+        "none",
+        "rdkit",
+        "cxcalc",
+    }, "Invalid canonicalization method, must be one of 'none', 'rdkit', 'cxcalc'"
     medchem_atoms = {1, 5, 6, 7, 8, 9, 15, 16, 17, 35, 53}  # 5: Boron
     molvs_s = Standardizer()
     molvs_l = LargestFragmentChooser()
@@ -189,8 +201,17 @@ def process(
     if deglyco:
         deglyco_str = "_deglyco"
     canon_str = ""
-    if not canon:
+    if canon == "none":
         canon_str = "_nocanon"
+    elif canon == "rdkit":
+        canon_str = "_rdkit"
+    elif canon == "cxcalc":
+        if len(idcol) == 0:
+            print(
+                "ERROR: ID column must be specified for cxcalc canonicalization. Use option `--idcol`."
+            )
+            sys.exit(1)
+        canon_str = "_cxcalc"
     dupl_str = ""
     if keep_dupl:
         dupl_str = "_dupl"
@@ -229,11 +250,16 @@ def process(
     fn_base = fn[0][:first_dot]
     out_fn = f"{fn_base}_{out_type}{deglyco_str}{canon_str}{dupl_str}{min_ha_str}{max_ha_str}.tsv"
     outfile = open(out_fn, "w")
+    if canon == "cxcalc":
+        cx_calc_input_fn = f"{fn_base}_cxcalc_input.csv"
+        cx_calc_result_fn = f"{fn_base}_cxcalc_result.tsv"
+        cx_calc_inp = open(cx_calc_input_fn, "w")
+
     # Initialize reader for the correct input type
 
     if verbose:
         # Add file name info and print newline after each info line.
-        fn_info = f"({fn_base})"
+        fn_info = f"({fn_base}) "
         end_char = "\n"
     else:
         fn_info = ""
@@ -285,6 +311,13 @@ def process(
                 header.append("InChIKey")
                 sd_props = set(header.copy())
                 header.append("Smiles")
+                if canon == "cxcalc":
+                    if idcol not in header:
+                        print(
+                            f"Id column `{idcol}` was not found in the dataset. It must be present for cxcalc canonicalization"
+                        )
+                        return
+                    cx_calc_inp.write(f"{idcol},Smiles\n")
                 outfile.write("\t".join(header) + "\n")
 
             mol_props = set()
@@ -340,9 +373,10 @@ def process(
                     ctr["Fail_NoMol"] += 1
                     continue
 
-            if not canon:
-                # When canonicalization is not performed,
-                # we can check for duplicates already here:
+            if canon == "none" or canon == "cxcalc":
+                # When canonicalization is not performed,  or when `cxcalc` is used,
+                # we can check for duplicates already here.
+                # When cxcalc is used, a final deduplication step has to be performed at the end.
                 try:
                     inchi = Chem.inchi.MolToInchiKey(mol)
                 except:
@@ -371,7 +405,7 @@ def process(
                     ctr["Filter"] += 1
                     continue
 
-            if canon:
+            if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
                 mol_copy = deepcopy(mol)  # copy the mol to restore it after a timeout
                 timed_out = True
@@ -412,17 +446,19 @@ def process(
             ctr["Out"] += 1
             line = [str(d[x]) for x in header]
             outfile.write("\t".join(line) + "\n")
+            if canon == "cxcalc":
+                cx_calc_inp.write(f"{d[idcol]},{smi}\n")
 
             if ctr["In"] % every_n == 0:
                 if deglyco:
                     print(
-                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
+                        f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
                         f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
                         end=end_char,
                     )
                 else:
                     print(
-                        f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
+                        f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
                         f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
                         end=end_char,
                     )
@@ -430,18 +466,81 @@ def process(
 
         if do_close:
             file_obj.close()
+    if canon == "cxcalc":
+        cx_calc_inp.close()
     outfile.close()
     if deglyco:
         print(
-            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
+            f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
             f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
         )
     else:
         print(
-            f"{fn_info}  In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
+            f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
             f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
         )
     print("")
+    if canon == "cxcalc":
+        print(f"{fn_info}Calling cxcalc to generate tautomers...")
+        try:
+            subprocess.run(
+                [
+                    "cxcalc",
+                    "-i",
+                    idcol,
+                    "-o",
+                    cx_calc_result_fn,
+                    cx_calc_input_fn,
+                    "majortautomer",
+                    "-H",
+                    "7.4",
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"{fn_info}Cxcalc failed with exit code {e.returncode}.")
+            sys.exit(1)
+        print(f"{fn_info}Merging data...")
+        df_in = pd.read_csv(out_fn, sep="\t")
+        df_in = df_in.rename(columns={"Smiles": "Smiles_orig"})
+        df_cxcalc = pd.read_csv(cx_calc_result_fn, sep="\t")
+        df_cxcalc = df_cxcalc.rename(columns={"structure": "Smiles_cxcalc"})
+        df = pd.merge(df_in, df_cxcalc, on=idcol, how="left")
+        assert len(df) == len(
+            df_in
+        ), f"{fn_info}Length of merged dataframe does not match."
+        tmp = df[df["Smiles_cxcalc"].isna()]
+        if len(tmp) > 0:
+            print(
+                f"{fn_info}{len(tmp)} records failed canonicalization in cxcalc. Original Smiles will be used for these."
+            )
+            if DEBUG:
+                cx_calc_failed_fn = f"{fn_base}_cxcalc_failed.tsv"
+                tmp.to_csv(cx_calc_failed_fn, sep="\t", index=False)
+        df["Smiles"] = df["Smiles_cxcalc"].fillna(df["Smiles_orig"])
+        df = df.drop(columns=["Smiles_orig", "Smiles_cxcalc", "InChIKey"], axis=1)
+        print(f"{fn_info}Re-calculating InChIKeys...")
+        prev_len = len(df)
+        df = utils.calc_from_smiles(df, "CanSmiles", Chem.MolToSmiles)
+        df = df.drop(columns=["Smiles"], axis=1)
+        df = df.rename(columns={"CanSmiles": "Smiles"})
+        df = inchi_from_smiles(df, filter_nans=True)
+        if len(df) - prev_len > 0:
+            print(
+                f"{fn_info}{len(df) - prev_len} records were removed due to missing InChIKeys."
+            )
+
+        if not keep_dupl:
+            print(f"{fn_info}Removing duplicates...")
+            df = df.drop_duplicates(subset=["InChIKey"])
+
+        print(f"{fn_info}Writing final data ({len(df)} records)...")
+        df.to_csv(out_fn, sep="\t", index=False)
+        if not DEBUG:
+            print(f"{fn_info}Removing temporary files...")
+            os.remove(cx_calc_input_fn)
+            os.remove(cx_calc_result_fn)
+        print(f"{fn_info}Merging done.")
 
 
 if __name__ == "__main__":
@@ -451,17 +550,17 @@ Standardize structures. Input files can be CSV, TSV with the structures in a `Sm
 or an SD file. The files may be gzipped.
 All entries with failed molecules will be removed.
 By default, duplicate entries will be removed by InChIKey (can be turned off with the `--keep_dupl` option)
-and structure canonicalization will be performed (can be turned off with the `--nocanon`option),
+and structure canonicalization using the RDKit will be performed (can be turned with the `--canon=none` option),
 where a timeout is enforced on the canonicalization if it takes longer than 2 seconds per structure.
 Timed-out structures WILL NOT BE REMOVED, they are kept in their state before canonicalization.
-Omitting structure canonicalization drastically improves the performance.
+Omitting structure canonicalization drastically reduces the runtime of the script.
 Also, structures that fail the deglycosylation step WILL NOT BE REMOVED and the original structure is kept.
 The output will be a tab-separated text file with SMILES.
 
 Example:
 Standardize the ChEMBL SDF download (gzipped), keep only MedChem atoms
 and molecules between 3-50 heavy atoms, do not perform canonicalization:
-    `$ ./stand_struct.py chembl_29.sdf.gz medchemrac --nocanon`
+    $ ./stand_struct.py chembl_29.sdf.gz medchemrac --canon=none
             """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -493,9 +592,21 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
         ),
     )
     parser.add_argument(
+        "--canon",
+        choices=["none", "rdkit", "cxcalc"],
+        default="rdkit",
+        help="Select an algorithm for tautomer generation. `cxcalc` requires the ChemAxon cxcalc tool to be installed.",
+    )
+    parser.add_argument(
+        "--idcol",
+        type=str,
+        default="",
+        help="Name of the column that contains a unique identifier for the dataset. Required for canonicalization with `cxcalc`.",
+    )
+    parser.add_argument(
         "--nocanon",
         action="store_true",
-        help="Turning off structure canonicalization greatly improves performance.",
+        help="Do not perform canonicalization. DEPRECATED - use `--canon=none` instead.",
     )
     parser.add_argument(
         "--min_heavy_atoms",
@@ -536,6 +647,12 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
         help="Turn on verbose status output.",
     )
     args = parser.parse_args()
+    if args.nocanon:
+        print(
+            "NOTE: The `--nocanon` option is DEPRECATED - use `--canon=none` instead."
+        )
+        args.canon = "none"
+
     print(args)
     if args.deglyco:
         try:
@@ -543,10 +660,20 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
         except:
             print("deglycosylate() not found, please install jupy_tools.")
             sys.exit(1)
+    if args.canon == "cxcalc":
+        try:
+            from jupy_tools import utils
+            from jupy_tools.utils import inchi_from_smiles
+
+            utils.TQDM = False
+        except:
+            print("inchi_from_smiles() not found, please install jupy_tools.")
+            sys.exit(1)
     process(
         args.in_file,
         args.output_type,
-        not args.nocanon,
+        args.canon,
+        args.idcol,
         args.columns,
         args.min_heavy_atoms,
         args.max_heavy_atoms,
