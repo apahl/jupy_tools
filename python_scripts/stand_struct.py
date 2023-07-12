@@ -15,8 +15,6 @@ import gzip
 import csv
 from copy import deepcopy
 import argparse
-import signal
-from contextlib import contextmanager
 import subprocess
 
 import pandas as pd
@@ -29,36 +27,14 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.MolStandardize.charge import Uncharger
 from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
 from rdkit.Chem.MolStandardize.standardize import Standardizer
-from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
+
+from rdkit.Chem.MolStandardize.rdMolStandardize import TautomerEnumerator
 
 from rdkit import RDLogger
 
 LOG = RDLogger.logger()
 LOG.setLevel(RDLogger.CRITICAL)
 DEBUG = False
-
-
-# Timeout code is taken from José's NPFC project:
-# https://github.com/mpimp-comas/npfc/blob/master/npfc/utils.py
-def raise_timeout(signum, frame):
-    """Function to actually raise the TimeoutError when the time has come."""
-    raise TimeoutError("Timed out.")
-
-
-@contextmanager
-def timeout(time):
-    # register a function to raise a TimeoutError on the signal.
-    signal.signal(signal.SIGALRM, raise_timeout)
-    # schedule the signal to be sent after time
-    signal.alarm(time)
-    # run the code block within the with statement
-    try:
-        yield
-    except TimeoutError:
-        pass  # exit the with statement
-    finally:
-        # unregister the signal so it won't be triggered if the timeout is not reached
-        signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
 
 def get_value(str_val):
@@ -195,7 +171,8 @@ def process(
     molvs_s = Standardizer()
     molvs_l = LargestFragmentChooser()
     molvs_u = Uncharger()
-    molvs_t = TautomerCanonicalizer()
+    # molvs_t = TautomerCanonicalizer(max_tautomers=500)
+    molvs_t = TautomerEnumerator()
 
     deglyco_str = ""
     if deglyco:
@@ -237,10 +214,9 @@ def process(
             "Fail_Deglyco",
             "Duplicates",
             "Filter",
-            "Timeout",
         ]
     else:
-        ctr_columns = ["In", "Out", "Fail_NoMol", "Duplicates", "Filter", "Timeout"]
+        ctr_columns = ["In", "Out", "Fail_NoMol", "Duplicates", "Filter"]
     ctr = {x: 0 for x in ctr_columns}
     first_mol = True
     sd_props = set()
@@ -407,20 +383,7 @@ def process(
 
             if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
-                mol_copy = deepcopy(mol)  # copy the mol to restore it after a timeout
-                timed_out = True
-                with timeout(2):
-                    try:
-                        mol = molvs_t.canonicalize(mol)
-                        timed_out = False
-                    except:
-                        # in case of a canonicalization error, restore original mol
-                        mol = mol_copy
-                if timed_out:
-                    ctr[
-                        "Timeout"
-                    ] += 1  # increase the counter but do not fail the entry
-                    mol = mol_copy  # instead, restore from the copy
+                mol = molvs_t.Canonicalize(mol)
                 if mol is None:
                     ctr["Fail_NoMol"] += 1
                     continue
@@ -453,13 +416,13 @@ def process(
                 if deglyco:
                     print(
                         f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
-                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
+                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}       ",
                         end=end_char,
                     )
                 else:
                     print(
                         f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
-                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}       ",
+                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}       ",
                         end=end_char,
                     )
                 sys.stdout.flush()
@@ -472,12 +435,12 @@ def process(
     if deglyco:
         print(
             f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
-            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
+            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}   done.",
         )
     else:
         print(
             f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
-            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}  Timeout: {ctr['Timeout']:6d}   done.",
+            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}   done.",
         )
     print("")
     if canon == "cxcalc":
@@ -550,11 +513,9 @@ Standardize structures. Input files can be CSV, TSV with the structures in a `Sm
 or an SD file. The files may be gzipped.
 All entries with failed molecules will be removed.
 By default, duplicate entries will be removed by InChIKey (can be turned off with the `--keep_dupl` option)
-and structure canonicalization using the RDKit will be performed (can be turned with the `--canon=none` option),
-where a timeout is enforced on the canonicalization if it takes longer than 2 seconds per structure.
-Timed-out structures WILL NOT BE REMOVED, they are kept in their state before canonicalization.
+and structure canonicalization using the RDKit will be performed (can be turned with the `--canon=none` option).
 Omitting structure canonicalization drastically reduces the runtime of the script.
-Also, structures that fail the deglycosylation step WILL NOT BE REMOVED and the original structure is kept.
+Structures that fail the deglycosylation step WILL NOT BE REMOVED and the original structure is kept.
 The output will be a tab-separated text file with SMILES.
 
 Example:
