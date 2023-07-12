@@ -42,7 +42,7 @@ DEBUG = False
 # https://github.com/mpimp-comas/npfc/blob/master/npfc/utils.py
 def raise_timeout(signum, frame):
     """Function to actually raise the TimeoutError when the time has come."""
-    raise TimeoutError
+    raise TimeoutError("Timed out.")
 
 
 @contextmanager
@@ -195,7 +195,7 @@ def process(
     molvs_s = Standardizer()
     molvs_l = LargestFragmentChooser()
     molvs_u = Uncharger()
-    molvs_t = TautomerCanonicalizer(max_tautomers=100)
+    molvs_t = TautomerCanonicalizer()
 
     deglyco_str = ""
     if deglyco:
