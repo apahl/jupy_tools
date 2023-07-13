@@ -459,7 +459,7 @@ def process(
                 # Late canonicalization, because it is so expensive:
                 mol_copy = deepcopy(mol)  # copy the mol to restore it after a timeout
                 timed_out = True
-                with TimeOut(2):
+                with TimeOut(3):
                     try:
                         mol = molvs_t.canonicalize(mol)
                         timed_out = False
