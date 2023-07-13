@@ -15,6 +15,9 @@ import gzip
 import csv
 from copy import deepcopy
 import argparse
+import signal
+
+# from contextlib import contextmanager
 import subprocess
 
 import pandas as pd
@@ -27,14 +30,58 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.MolStandardize.charge import Uncharger
 from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
 from rdkit.Chem.MolStandardize.standardize import Standardizer
-
 from rdkit.Chem.MolStandardize.rdMolStandardize import TautomerEnumerator
+
+# Legacy tautomer canonicalizer:
+from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
 
 from rdkit import RDLogger
 
 LOG = RDLogger.logger()
 LOG.setLevel(RDLogger.CRITICAL)
 DEBUG = False
+
+
+# Code for legacy tautomer canonicalizer:
+# Timeout code is taken from José's NPFC project:
+# https://github.com/mpimp-comas/npfc/blob/master/npfc/utils.py
+def raise_timeout(signum, frame):
+    """Function to actually raise the TimeoutError when the time has come."""
+    raise TimeoutError
+
+
+# Code for legacy tautomer canonicalizer:
+# @contextmanager
+# def timeout(time):
+#     # register a function to raise a TimeoutError on the signal.
+#     signal.signal(signal.SIGALRM, raise_timeout)
+#     # schedule the signal to be sent after time
+#     signal.alarm(time)
+#     # run the code block within the with statement
+#     try:
+#         yield
+#     except TimeoutError:
+#         pass  # exit the with statement
+#     finally:
+#         # unregister the signal so it won't be triggered if the timeout is not reached
+#         signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+
+class TimeOut(object):
+    """Context manager to raise a TimeoutError if a block of code takes too long."""
+
+    def __init__(self, seconds):
+        self.seconds = seconds
+
+    def __enter__(self):
+        # register a function to raise a TimeoutError on the signal.
+        signal.signal(signal.SIGALRM, raise_timeout)
+        # schedule the signal to be sent after time
+        signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        # unregister the signal so it won't be triggered if the timeout is not reached
+        signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
 
 def get_value(str_val):
@@ -166,13 +213,15 @@ def process(
         "none",
         "rdkit",
         "cxcalc",
+        "legacy",
     }, "Invalid canonicalization method, must be one of 'none', 'rdkit', 'cxcalc'"
     medchem_atoms = {1, 5, 6, 7, 8, 9, 15, 16, 17, 35, 53}  # 5: Boron
     molvs_s = Standardizer()
     molvs_l = LargestFragmentChooser()
     molvs_u = Uncharger()
-    # molvs_t = TautomerCanonicalizer(max_tautomers=500)
-    molvs_t = TautomerEnumerator()
+    te = TautomerEnumerator()
+    # Legacy tautomer canonicalizer:
+    molvs_t = TautomerCanonicalizer(max_tautomers=100)
 
     deglyco_str = ""
     if deglyco:
@@ -182,6 +231,8 @@ def process(
         canon_str = "_nocanon"
     elif canon == "rdkit":
         canon_str = "_rdkit"
+    elif canon == "legacy":
+        canon_str = "_legacy"
     elif canon == "cxcalc":
         if len(idcol) == 0:
             print(
@@ -217,6 +268,8 @@ def process(
         ]
     else:
         ctr_columns = ["In", "Out", "Fail_NoMol", "Duplicates", "Filter"]
+    if canon == "legacy":
+        ctr_columns.append("Timeout")
     ctr = {x: 0 for x in ctr_columns}
     first_mol = True
     sd_props = set()
@@ -383,7 +436,41 @@ def process(
 
             if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
-                mol = molvs_t.Canonicalize(mol)
+                mol = te.Canonicalize(mol)
+                if mol is None:
+                    ctr["Fail_NoMol"] += 1
+                    continue
+                try:
+                    inchi = Chem.inchi.MolToInchiKey(mol)
+                except:
+                    ctr["Fail_NoMol"] += 1
+                    continue
+                if not keep_dupl:
+                    # When canonicalization IS performed,
+                    # we have to check for duplicates now:
+                    if inchi in inchi_keys:
+                        ctr["Duplicates"] += 1
+                        continue
+                    inchi_keys.add(inchi)
+                d["InChIKey"] = inchi
+
+            # Using RDKit legacy tautomer canonicalizer for compatibility with previous versions:
+            if canon == "legacy":
+                # Late canonicalization, because it is so expensive:
+                mol_copy = deepcopy(mol)  # copy the mol to restore it after a timeout
+                timed_out = True
+                with TimeOut(2):
+                    try:
+                        mol = molvs_t.canonicalize(mol)
+                        timed_out = False
+                    except:
+                        # in case of a canonicalization error, restore original mol
+                        mol = mol_copy
+                if timed_out:
+                    ctr[
+                        "Timeout"
+                    ] += 1  # increase the counter but do not fail the entry
+                    mol = mol_copy  # instead, restore from the copy
                 if mol is None:
                     ctr["Fail_NoMol"] += 1
                     continue
@@ -413,16 +500,20 @@ def process(
                 cx_calc_inp.write(f"{d[idcol]},{smi}\n")
 
             if ctr["In"] % every_n == 0:
+                if canon == "legacy":
+                    timeout_str = f"  Timeout: {ctr['Timeout']:6d}"
+                else:
+                    timeout_str = ""
                 if deglyco:
                     print(
                         f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
-                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}       ",
+                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}{timeout_str}       ",
                         end=end_char,
                     )
                 else:
                     print(
                         f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
-                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}       ",
+                        f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}{timeout_str}       ",
                         end=end_char,
                     )
                 sys.stdout.flush()
@@ -432,15 +523,19 @@ def process(
     if canon == "cxcalc":
         cx_calc_inp.close()
     outfile.close()
+    if canon == "legacy":
+        timeout_str = f"  Timeout: {ctr['Timeout']:6d}"
+    else:
+        timeout_str = ""
     if deglyco:
         print(
             f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  Deglyco: {ctr['Deglyco']:6d}  Fail_Deglyco: {ctr['Fail_Deglyco']:4d}  "
-            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}   done.",
+            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}{timeout_str}   done.",
         )
     else:
         print(
             f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
-            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}   done.",
+            f"Dupl: {ctr['Duplicates']:6d}  Filt: {ctr['Filter']:6d}{timeout_str}   done.",
         )
     print("")
     if canon == "cxcalc":
@@ -554,9 +649,9 @@ and molecules between 3-50 heavy atoms, do not perform canonicalization:
     )
     parser.add_argument(
         "--canon",
-        choices=["none", "rdkit", "cxcalc"],
+        choices=["none", "rdkit", "cxcalc", "legacy"],
         default="rdkit",
-        help="Select an algorithm for tautomer generation. `cxcalc` requires the ChemAxon cxcalc tool to be installed.",
+        help="Select an algorithm for tautomer generation. `rdkit` uses the new C++ implementation from `rdMolStandardize.TautomerEnumerator`, `legacy` uses the older canonicalizer from `MolStandardize.tautomer`. `cxcalc` requires the ChemAxon cxcalc tool to be installed.",
     )
     parser.add_argument(
         "--idcol",
