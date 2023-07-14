@@ -473,7 +473,7 @@ def mol_grid(
         if bar is not None:
             plt.figure(figsize=(6, 6))
             bar_values = rec[bar].values
-            chart = sns.barplot(bar, bar_values, color="#94caef")
+            chart = sns.barplot(x=bar, y=bar_values, color="#94caef")
             if bar_names_max_len > 1:
                 plt.xticks(rotation=90)
             if ylim is not None:
