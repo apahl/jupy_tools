@@ -1218,7 +1218,7 @@ def load_list(fn="list.txt", as_type=str, skip_remarks=True, skip_empty=True):
     """Read the lines of a text file into a list.
 
     Parameters:
-    ==========
+    ===========
     as_type: Convert the values in the file to the given format. (Default: str).
     skip_remarks: Skip lines starting with `#` (default: True).
     skip_empty: Skip empty lines. (Default: True).
@@ -1248,9 +1248,15 @@ def open_in_localc(df: pd.DataFrame):
     subprocess.Popen(["localc", path])
 
 
-def listify(s, sep=" ", as_int=True, strip=True):
+def listify(s, sep=" ", as_int=True, strip=True, sort=False):
     """A helper func for the Jupyter Notebook,
-    which generates a correctly formatted list out of pasted text."""
+    which generates a correctly formatted list out of pasted text.
+
+    Parameters:
+    ===========
+    as_int: The function always attempts to convert the entries to numbers This option controls whether the numbers are converted to int (default: true) or float (false).
+    sort: Sort the output list (default: False).
+    """
     to_number = int if as_int else float
     result = []
     if s.startswith("["):
