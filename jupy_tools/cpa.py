@@ -646,7 +646,8 @@ def profile_sim(
 
     Returns:
     ========
-        Similarity value between 0.0 .. 1.0 (0.0 being very dissimilar and 1.0 identical)."""
+        Similarity value between 0.0 .. 1.0 (0.0 being very dissimilar and 1.0 identical).
+    """
 
     assert len(prof1) == len(
         prof2
@@ -701,7 +702,8 @@ def find_similar(
         If True, the results are sorted by the similarity value, in descending order.
 
 
-    Returns a Pandas DF with the most similar entries (similarity in percent) or None when no similars are found."""
+    Returns a Pandas DF with the most similar entries (similarity in percent) or None when no similars are found.
+    """
 
     act_features = features.copy()
     assert len(act_features) > 0
@@ -762,8 +764,14 @@ def get_func_cluster_features(cluster: str, include_well_id=True) -> pd.DataFram
     return cl_parms
 
 
-def add_func_clusters(df: pd.DataFrame) -> pd.DataFrame:
+def add_func_clusters(
+    df: pd.DataFrame, clusters: Optional[List[str]] = None
+) -> pd.DataFrame:
     """Add the similarities to the functional clusters to the dataframe.
+
+    Parameters:
+        clusters: An optional list of clusters to use. If no list is given,
+            the list of clusters is extracted from the median profile files in the `OUTPUT` dir.
 
     Raises:
         ValueError: when no functional cluster definitions are found.
@@ -778,7 +786,10 @@ def add_func_clusters(df: pd.DataFrame) -> pd.DataFrame:
         result = round(100 * profile_sim(prof1, prof2), 1)
         return result
 
-    func_clusters = get_func_cluster_names(prefix="")
+    if clusters is None:
+        func_clusters = get_func_cluster_names(prefix="")
+    else:
+        func_clusters = clusters.copy()
     if func_clusters is None:
         raise ValueError("No functional clusters found.")
 
