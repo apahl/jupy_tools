@@ -41,19 +41,17 @@ The output is always a TSV file, various options are available, please have a lo
 
 ```
 $ stand_struct --help
-usage: stand_struct [-h] [--canon {none,rdkit,cxcalc}] [--idcol IDCOL] [--nocanon] [--min_heavy_atoms MIN_HEAVY_ATOMS] [--max_heavy_atoms MAX_HEAVY_ATOMS]
-                    [-d] [-c COLUMNS] [-n N] [--deglyco] [-v]
+usage: stand_struct [-h] [--canon {none,rdkit,cxcalc,legacy}] [--idcol IDCOL] [--nocanon] [--min_heavy_atoms MIN_HEAVY_ATOMS]
+                    [--max_heavy_atoms MAX_HEAVY_ATOMS] [-d] [-c COLUMNS] [-n N] [--deglyco] [-v]
                     in_file {full,fullrac,medchem,medchemrac,fullmurcko,medchemmurcko,fullracmurcko,medchemracmurcko}
 
 Standardize structures. Input files can be CSV, TSV with the structures in a `Smiles` column
 or an SD file. The files may be gzipped.
 All entries with failed molecules will be removed.
 By default, duplicate entries will be removed by InChIKey (can be turned off with the `--keep_dupl` option)
-and structure canonicalization using the RDKit will be performed (can be turned with the `--canon=none` option),
-where a timeout is enforced on the canonicalization if it takes longer than 2 seconds per structure.
-Timed-out structures WILL NOT BE REMOVED, they are kept in their state before canonicalization.
+and structure canonicalization using the RDKit will be performed (can be turned with the `--canon=none` option).
 Omitting structure canonicalization drastically reduces the runtime of the script.
-Also, structures that fail the deglycosylation step WILL NOT BE REMOVED and the original structure is kept.
+Structures that fail the deglycosylation step WILL NOT BE REMOVED and the original structure is kept.
 The output will be a tab-separated text file with SMILES.
 
 Example:
@@ -73,8 +71,9 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --canon {none,rdkit,cxcalc}
-                        Select an algorithm for tautomer generation. `cxcalc` requires the ChemAxon cxcalc tool to be installed.
+  --canon {none,rdkit,cxcalc,legacy}
+                        Select an algorithm for tautomer generation. `rdkit` uses the new C++ implementation from `rdMolStandardize.TautomerEnumerator`,
+                        `legacy` uses the older canonicalizer from `MolStandardize.tautomer`. `cxcalc` requires the ChemAxon cxcalc tool to be installed.
   --idcol IDCOL         Name of the column that contains a unique identifier for the dataset. Required for canonicalization with `cxcalc`.
   --nocanon             Do not perform canonicalization. DEPRECATED - use `--canon=none` instead.
   --min_heavy_atoms MIN_HEAVY_ATOMS
