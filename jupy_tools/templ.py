@@ -264,6 +264,44 @@ function onSubmit() {{
 '''
 
 
+# TABLE, HEADERS, CELLS and TABLE_SORTER are styling templates used for `write_mol_table()`
+TABLE = {
+    "selector": "",
+    "props": "font-family: freesans, arial, verdana, sans-serif; border-collapse: collapse; border-width:thin; border-style:solid; border: none; text-align: center;",
+}
+
+HEADERS = {
+    "selector": "th",
+    "props": "text-align: center; font-size: 14pt; font-weight: bold; background-color: #94caef; border-collapse: collapse; border-width:thin; border-style: solid; border-color: black; padding: 5px; cursor: pointer;",
+}
+
+CELLS = {
+    "border-collapse": "collapse",
+    "border-width": "thin",
+    "border-style": "solid",
+    "border-color": "black",
+    "padding": "5px",
+}
+
+TABLE_SORTER = """<script>
+window.onload = function() {
+const getCellValue = (tr, idx) => tr.children[idx].innerText || tr.children[idx].textContent;
+
+const comparer = (idx, asc) => (a, b) => ((v1, v2) =>
+    v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2) ? v1 - v2 : v1.toString().localeCompare(v2)
+    )(getCellValue(asc ? a : b, idx), getCellValue(asc ? b : a, idx));
+
+// do the work...
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', (() => {
+    const table = th.closest('table');
+    Array.from(table.querySelectorAll('tr:nth-child(n+2)'))
+        .sort(comparer(Array.from(th.parentNode.children).indexOf(th), this.asc = !this.asc))
+        .forEach(tr => table.appendChild(tr) );
+})));
+}
+</script>"""
+
+
 def bootstrap_options(
     table: str, selectable=False, id_col="Compound_Id", height=1200
 ) -> str:
@@ -342,7 +380,7 @@ def tag(name, content, options=None, lf_open=False, lf_close=False):
         option_str = "".join(option_list)
 
     stub = ["<{}{}>{}".format(name, option_str, lf_open_str)]
-    if type(content) == list:
+    if isinstance(content, list):
         stub.extend(content)
     else:
         stub.append(content)
@@ -417,7 +455,7 @@ table {
 
     if "scripts" in options and options["scripts"]:
         scripts = options["scripts"]
-        if type(scripts) != list:
+        if not isinstance(scripts, list):
             scripts = [scripts]
 
         js_str = "".join(
@@ -555,5 +593,6 @@ def b(content, options=None):
 
 def a(content, options):
     """the anchor tag requires an "href" in options,
-    therefore the "options" parameter is not optional in this case (klingt komisch, ist aber so)"""
+    therefore the "options" parameter is not optional in this case (klingt komisch, ist aber so)
+    """
     return tag("a", content, options, lf_close=False)

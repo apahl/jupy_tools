@@ -11,12 +11,10 @@ from itertools import chain
 from io import BytesIO as IO
 import os
 import os.path as op
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import pandas as pd
 import numpy as np
-
-pd.set_option("display.max_colwidth", None)
 
 from PIL import Image, ImageChops
 
@@ -32,6 +30,9 @@ USE_RDKIT_NEW_COORD = True
 BGCOLOR = "#94CAEF"
 IMG_GRID_SIZE = 235
 SVG = True
+THEME = "light"  # "light" or "dark" (for SVG structure display)
+
+pd.set_option("display.max_colwidth", None)
 
 
 def is_interactive_ipython():
@@ -129,6 +130,7 @@ class MolImage:
         svg: Optional[bool] = None,
         hlsss: Optional[str] = None,
         options: Optional[str] = None,
+        **kwargs,
     ):
         """
         Generate an image (SVG or PNG) of a molecule.
@@ -147,20 +149,30 @@ class MolImage:
             Highlight the substructure given as Smiles.
         options : str or None
             Additional HTML options for the drawing.
+        KWargs:
+            alt_text: whether to include Smiles (default) or the MolBlock as alt text.
+                Use e.g. the firefox extension `Copy Image Text` to copy the alt text.
         """
         self.mol = mol
+        self.smiles = None  # used for the alternative text in the img tag
         if isinstance(self.mol, str):  # convert from Smiles on-the-fly, when necessary
             if len(self.mol) > 0:
+                self.smiles = mol
                 self.mol = Chem.MolFromSmiles(mol)
             else:
+                self.smiles = "*"
                 self.mol = Chem.MolFromSmiles("*")
+        else:
+            self.smiles = Chem.MolToSmiles(mol)
         if self.mol is None or self.mol is np.nan:
+            self.smiles = "*"
             self.mol = Chem.MolFromSmiles("*")
 
         self.size = size
         self.svg = svg if svg is not None else SVG
         assert isinstance(self.svg, bool)
         self.hlsss = hlsss
+        alt_text = kwargs.get("alt_text", "smiles").lower()
 
         if hlsss is not None:
             if isinstance(hlsss, str):
@@ -179,10 +191,16 @@ class MolImage:
             hl_atoms = {}
 
         add_coords(self.mol)
+        if "smiles" in alt_text:
+            self.alt_text = self.smiles
+        else:
+            self.alt_text = Chem.MolToMolBlock(self.mol)
         if self.svg:
             d2d = rdMolDraw2D.MolDraw2DSVG(size, size)
         else:
             d2d = rdMolDraw2D.MolDraw2DCairo(size, size)
+        dos = d2d.drawOptions()
+        dos.multipleBondOffset = 0.20
         d2d.DrawMoleculeWithHighlights(self.mol, "", hl_atoms, {}, {}, {})
         d2d.FinishDrawing()
         img = d2d.GetDrawingText()
@@ -192,6 +210,8 @@ class MolImage:
                 line for line in img.splitlines()[1:] if not line.startswith("<rect")
             ]
             img = "\n".join(img_list)
+            if THEME == "dark":
+                img = img.replace("#000000", "#FFFFFF")
 
         else:
             try:
@@ -215,11 +235,11 @@ class MolImage:
         if self.svg:
             img = bytes(self.txt, encoding="iso-8859-1")
             img = b64_mol(img)
-            tag = """<img {} src="data:image/svg+xml;base64,{}" alt="Mol"/>"""
-            self.tag = tag.format(options, img)
+            tag = """<img {} src="data:image/svg+xml;base64,{}" alt="{}"/>"""
+            self.tag = tag.format(options, img, self.alt_text)
         else:
-            tag = """<img {} src="data:image/png;base64,{}" alt="Mol"/>"""
-            self.tag = tag.format(options, b64_mol(img))
+            tag = """<img {} src="data:image/png;base64,{}" alt="{}"/>"""
+            self.tag = tag.format(options, b64_mol(img), self.alt_text)
 
     def save(self, fn):
         if (self.svg and not fn.lower().endswith("svg")) or (
@@ -243,7 +263,9 @@ def write(text, fn):
 #     return pd.Series(mol_img_tag(mol))
 
 
-def add_image_tag(df, col, size=300, svg=None, options=None):
+def add_image_tag(
+    df, col, smiles_col="Smiles", size=300, svg=None, options=None, **kwargs
+):
     """
     Add an image tag to a dataframe column.
     The image tag can be used to display the molecule in a web page.
@@ -261,8 +283,15 @@ def add_image_tag(df, col, size=300, svg=None, options=None):
         If None, the module default is used.
     options : str or None
         Additional HTML options for the drawing.
+    kwargs: are passed to the MolImage constructor.
     """
-    df = utils.calc_from_smiles(df, col, lambda x: MolImage(x, size, svg, options).tag)
+    df = utils.calc_from_smiles(
+        df,
+        col,
+        lambda x: MolImage(x, size, svg, options, **kwargs).tag,
+        smiles_col=smiles_col,
+        filter_nans=False,
+    )
     return df
 
 
@@ -328,7 +357,8 @@ def mol_grid(
         interactive (bool)
         as_html: return a Jupyter HTML object, when possible, otherwise return a string.
         link_templ, link_col (str) (then interactive is false)
-        bar [Option[list[str]]: displays the listed columns as bar chart in the grid. Y-limits can be set with the `ylim` tuple.
+        bar [Option[list[str]]: displays the listed columns as bar chart in the grid.
+            Y-limits can be set with the `ylim` tuple.
     Returns:
         HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page.
     """
@@ -349,19 +379,19 @@ def mol_grid(
     if img_folder is not None:
         os.makedirs(img_folder, exist_ok=True)
 
-    interact = kwargs.get("interactive", False)
-    link_templ = kwargs.get("link_templ", None)
-    link_col = kwargs.get("link_col", None)
+    interact = kwargs.pop("interactive", False)
+    link_templ = kwargs.pop("link_templ", None)
+    link_col = kwargs.pop("link_col", None)
     if link_col is not None:
         interact = (
             False  # interact is not avail. when clicking the image should open a link
         )
-    mols_per_row = kwargs.get("mols_per_row", 5)
-    hlsss = kwargs.get(
+    mols_per_row = kwargs.pop("mols_per_row", 5)
+    hlsss = kwargs.pop(
         "hlsss", None
     )  # colname with Smiles (,-separated) for Atom highlighting
-    truncate = kwargs.get("truncate", 20)
-    ylim = kwargs.get("ylim", None)
+    truncate = kwargs.pop("truncate", 25)
+    ylim = kwargs.pop("ylim", None)
 
     df = df.copy()
     if mol_col not in df.keys():
@@ -445,7 +475,7 @@ def mol_grid(
                 img_fn = None
             img_opt = " ".join([f'{k}="{str(v)}"' for k, v in img_opt.items()])
             mol_img = MolImage(
-                mol, svg=svg, size=img_size, hlsss=hlsss_smi, options=img_opt
+                mol, svg=svg, size=img_size, hlsss=hlsss_smi, options=img_opt, **kwargs
             )
             if img_fn is not None:
                 mol_img.save(img_fn)
@@ -569,11 +599,22 @@ def write_mol_grid(
         df: DataFrame with molecules.
         title: Document title.
         fn: Filename to write.
+
+    KWargs:
+        alt_text: whether to include Smiles (default) or the MolBlock as alt text.
+            Use e.g. the firefox extension `Copy Alt Text` to copy the alt text.
     """
 
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
+
+    # Need to check here, because the `add_image_tag` function will run in a try / except block:
+    alt_text = kwargs.get("alt_text", "smiles").lower()
+    if "smiles" not in alt_text and "block" not in alt_text:
+        raise ValueError(
+            f"Unknown value for `alt_text`: {alt_text}. Must be 'smiles' (default) or 'molblock'."
+        )
 
     if write_images:
         html_dir = op.dirname(fn)
@@ -595,9 +636,102 @@ def write_mol_grid(
         svg=svg,
         **kwargs,
     )
-    header = kwargs.get("header", None)
-    summary = kwargs.get("summary", None)
+    header = kwargs.pop("header", None)
+    summary = kwargs.pop("summary", None)
+
     page = templ.page(tbl, title=title, header=header, summary=summary)
+    utils.write(page, fn)
+    if IPYTHON:
+        return HTML('<a href="{}">{}</a>'.format(fn, title))
+
+
+def write_mol_table(
+    df: pd.DataFrame,
+    title: str = "MolTable",
+    fn: str = "moltable.html",
+    id_col="Compound_Id",
+    smiles_col: str | List[str] = "Smiles",
+    size: int | List[int] = 300,
+    svg=None,
+    formatter=None,
+    **kwargs,
+):
+    """
+    Write a table of molecules to a file and return the link.
+
+    Args:
+        df: DataFrame with molecules.
+        title: Document title.
+        fn: Filename to write.
+        smiles_col: Column name or list of column names with Smiles.
+            Each column will be displayed as a separate molecule.
+        size: Size of the image in pixels (default=300). If this is a list,
+            each column will be displayed with the corresponding size.
+
+    KWargs:
+        alt_text: whether to include Smiles (default) or the MolBlock as alt text.
+            Use e.g. the firefox extension `Copy Alt Text` to copy the alt text.
+    """
+    df = df.copy()
+    header = kwargs.pop("header", None)
+    summary = kwargs.pop("summary", None)
+
+    # Need to check here, because the `add_image_tag` function will run in a try / except block:
+    alt_text = kwargs.get("alt_text", "smiles").lower()
+    if "smiles" not in alt_text and "block" not in alt_text:
+        raise ValueError(
+            f"Unknown value for `alt_text`: {alt_text}. Must be 'smiles' (default) or 'molblock'."
+        )
+
+    # Some sanity checks:
+    if svg is None:
+        svg = SVG
+    assert isinstance(svg, bool)
+    if isinstance(smiles_col, str):
+        smiles_col = [smiles_col]
+    for sc in smiles_col:
+        assert sc in df.keys(), f"Column {sc} not found in DataFrame."
+    if isinstance(size, int):
+        size = [size] * len(smiles_col)
+    assert len(size) == len(smiles_col)
+    assert id_col in df.keys(), f"Id Column {id_col} not found in DataFrame."
+
+    cols = df.keys()
+    # When there is only one structure columns, put it in front:
+    if len(smiles_col) == 1:
+        cols = [smiles_col[0]] + [x for x in cols if x != smiles_col[0]]
+
+    # Add the image tags
+    for idx, sc in enumerate(smiles_col):
+        df = add_image_tag(
+            df, f"{sc}_Mol", size=size[idx], svg=svg, smiles_col=sc, **kwargs
+        )
+
+    # Replace the positions of the Smiles columns with the Mol columns:
+    for idx, sc in enumerate(smiles_col):
+        cols = [f"{sc}_Mol" if x == sc else x for x in cols]
+
+    # Drop the Smiles columns:
+    df = df[cols]
+
+    style = (
+        df.style.format(formatter=formatter, escape=None)
+        .set_table_styles([templ.TABLE, templ.HEADERS])
+        .set_properties(**templ.CELLS)
+    )
+
+    # style.to_html("output/stats_fcc/fcc_diff_aminergic_gpcr.html", escape=False)
+    html = style.to_html(None)
+    lines = []
+    for line in html.split("\n"):
+        if "thead" in line:
+            continue
+        if "tbody" in line:
+            continue
+        lines.append(line)
+    html = "\n".join(lines)
+    html = html + templ.TABLE_SORTER
+    page = templ.page(html, title=title, header=header, summary=summary)
     utils.write(page, fn)
     if IPYTHON:
         return HTML('<a href="{}">{}</a>'.format(fn, title))
