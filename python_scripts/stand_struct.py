@@ -30,7 +30,10 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.MolStandardize.charge import Uncharger
 from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
 from rdkit.Chem.MolStandardize.standardize import Standardizer
-from rdkit.Chem.MolStandardize.rdMolStandardize import TautomerEnumerator
+from rdkit.Chem.MolStandardize.rdMolStandardize import (
+    TautomerEnumerator,
+    CleanupParameters,
+)
 
 # Legacy tautomer canonicalizer:
 from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
@@ -219,7 +222,13 @@ def process(
     molvs_s = Standardizer()
     molvs_l = LargestFragmentChooser()
     molvs_u = Uncharger()
-    te = TautomerEnumerator()
+    # Setting CleanUpParameters to retain stereochem information:
+    # This only works with the new tautomer enumerator (option `--canon=rdkit`).
+    cup = CleanupParameters()
+    cup.tautomerReassignStereo = True
+    cup.tautomerRemoveBondStereo = False
+    cup.tautomerRemoveSp3Stereo = False
+    te = TautomerEnumerator(cup)
     # Legacy tautomer canonicalizer:
     molvs_t = TautomerCanonicalizer(max_tautomers=100)
 
