@@ -122,11 +122,50 @@ def b64_fig(chart, format="PNG"):
     return b64
 
 
+class DrawingOptions:
+    def __init__(self):
+        """Create a default DrawingOptions instance."""
+        self.size = 300
+        self.use_colors = True
+        self.add_atom_indices = False
+        self.add_bond_indices = False
+        self.add_stereo_annotation = False
+        self.annotation_font_scale = 0.75  # RDKit default: 0.5
+        self.base_font_size = -1.0
+        self.bond_line_width = 2.0
+        self.max_font_size = 40
+        self.min_font_size = 6
+        self.multiple_bond_offset = 0.20  # RDKit default: 0.15
+
+    def update(self, dos):
+        """Update the given RDKit DrawingOptions instance `dos` with the options set in this instance.
+        The size is not updated, because it has to be set when the RDKit Canvas instance (`MolDraw2DXXX`) is created.
+        To emphasize: the RDKit instance `dos` is updated, not this instance."""
+        if not self.use_colors:
+            dos.useBWAtomPalette()
+        dos.addAtomIndices = self.add_atom_indices
+        dos.addBondIndices = self.add_bond_indices
+        dos.addStereoAnnotation = self.add_stereo_annotation
+        dos.annotationFontScale = self.annotation_font_scale
+        dos.baseFontSize = self.base_font_size
+        dos.bondLineWidth = self.bond_line_width
+        dos.maxFontSize = self.max_font_size
+        dos.minFontSize = self.min_font_size
+        dos.multipleBondOffset = self.multiple_bond_offset
+
+    def __repr__(self):
+        attr = ["DrawingOtions:"]
+        for k, v in self.__dict__.items():
+            if k.startswith("_"):
+                continue
+            attr.append(f"{k}={v}")
+        return "\n".join(attr)
+
+
 class MolImage:
     def __init__(
         self,
         mol: Union[Mol, str],
-        size: int = 300,
         svg: Optional[bool] = None,
         hlsss: Optional[str] = None,
         options: Optional[str] = None,
@@ -152,7 +191,27 @@ class MolImage:
         KWargs:
             alt_text: whether to include Smiles (default) or the MolBlock as alt text.
                 Use e.g. the firefox extension `Copy Image Text` to copy the alt text.
+
+        Image format options:
+            There are two ways to format the structure images:
+            1. Use the `size` and `use_colors` "quick access" options.
+            2. Pass a DrawingOptions dictionary as `drawing_options`. Use the function init_draw_options() to create a dict with default values.
+            When the second option is used, the `size` and `use_colors` options are ignored.
+            Each of the options can be either a single value or a list of values. If a list is passed,
+            it has to have the same length as the number of Smiles columns.
+
+            size: Size of the image in pixels (default=300).
+            use_colors: Whether to use colors for atoms (default=True).
+            drawing_options: instance of `DrawingOptions` for the structure display.
         """
+        size = kwargs.get("size", 300)
+        use_colors = kwargs.get("use_colors", True)
+        drawing_options = kwargs.get("drawing_options", None)
+
+        # print(f"{size=}")
+        # print(f"{use_colors=}")
+        # print(f"{drawing_options=}")
+        # print("------------------------------")
         self.mol = mol
         self.smiles = None  # used for the alternative text in the img tag
         if isinstance(self.mol, str):  # convert from Smiles on-the-fly, when necessary
@@ -168,7 +227,10 @@ class MolImage:
             self.smiles = "*"
             self.mol = Chem.MolFromSmiles("*")
 
-        self.size = size
+        if drawing_options is not None:
+            self.size = drawing_options.size
+        else:
+            self.size = size
         self.svg = svg if svg is not None else SVG
         assert isinstance(self.svg, bool)
         self.hlsss = hlsss
@@ -200,8 +262,16 @@ class MolImage:
         else:
             d2d = rdMolDraw2D.MolDraw2DCairo(size, size)
         dos = d2d.drawOptions()
-        dos.multipleBondOffset = 0.20
-        d2d.DrawMoleculeWithHighlights(self.mol, "", hl_atoms, {}, {}, {})
+        if drawing_options is None:
+            if not use_colors:
+                dos.useBWAtomPalette()
+            dos.multipleBondOffset = 0.20
+        else:
+            drawing_options.update(dos)
+        if hlsss is None:
+            d2d.DrawMolecule(self.mol)
+        else:
+            d2d.DrawMoleculeWithHighlights(self.mol, "", hl_atoms, {}, {}, {})
         d2d.FinishDrawing()
         img = d2d.GetDrawingText()
         if self.svg:
@@ -264,7 +334,12 @@ def write(text, fn):
 
 
 def add_image_tag(
-    df, col, smiles_col="Smiles", size=300, svg=None, options=None, **kwargs
+    df,
+    col,
+    smiles_col="Smiles",
+    svg=None,
+    options=None,
+    **kwargs,
 ):
     """
     Add an image tag to a dataframe column.
@@ -288,7 +363,12 @@ def add_image_tag(
     df = utils.calc_from_smiles(
         df,
         col,
-        lambda x: MolImage(x, size, svg, options, **kwargs).tag,
+        lambda x: MolImage(
+            x,
+            svg=svg,
+            options=options,
+            **kwargs,
+        ).tag,
         smiles_col=smiles_col,
         filter_nans=False,
     )
@@ -305,7 +385,7 @@ def _apply_link(input, link, ln_title="Link"):
     return result
 
 
-def show_mols(mols_or_smiles, cols=5, svg=None):
+def show_mols(mols_or_smiles, cols=5, size=IMG_GRID_SIZE, svg=None):
     """A small utility to quickly view a list of mols (or Smiles) in a grid."""
     if svg is None:
         svg = SVG
@@ -317,7 +397,7 @@ def show_mols(mols_or_smiles, cols=5, svg=None):
         mols_or_smiles = [mols_or_smiles]
     for mol in mols_or_smiles:
         idx += 1
-        mol_img = MolImage(mol, svg=svg)
+        mol_img = MolImage(mol, size=size, svg=svg)
         cell = "<td>{}<td>".format(mol_img.tag)
         row_line.append(cell)
         if idx == cols:
@@ -343,7 +423,6 @@ def mol_grid(
     smiles_col="Smiles",
     mol_col="Mol",
     id_col="Compound_Id",
-    size=IMG_GRID_SIZE,
     as_html=True,
     bar: Optional[list[str]] = None,
     svg=None,
@@ -359,6 +438,21 @@ def mol_grid(
         link_templ, link_col (str) (then interactive is false)
         bar [Option[list[str]]: displays the listed columns as bar chart in the grid.
             Y-limits can be set with the `ylim` tuple.
+
+    Image format options:
+        There are two ways to format the structure images:
+        1. Use the `size` and `use_colors` "quick access" options.
+        2. Pass a DrawingOptions dictionary as `drawing_options`. Use the function init_draw_options() to create a dict with default values.
+        When the second option is used, the `size` and `use_colors` options are ignored.
+        Each of the options can be either a single value or a list of values. If a list is passed,
+        it has to have the same length as the number of Smiles columns.
+
+        size: Size of the image in pixels (default=300).
+        use_colors: Whether to use colors for atoms (default=True).
+        drawing_options: instance of `DrawingOptions` for the structure display.
+
+        The image options are passed directly to the MolImage constructor.
+
     Returns:
         HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page.
     """
@@ -392,6 +486,9 @@ def mol_grid(
     )  # colname with Smiles (,-separated) for Atom highlighting
     truncate = kwargs.pop("truncate", 25)
     ylim = kwargs.pop("ylim", None)
+    if "size" not in kwargs:
+        kwargs["size"] = IMG_GRID_SIZE
+    size = kwargs["size"]
 
     df = df.copy()
     if mol_col not in df.keys():
@@ -469,14 +566,13 @@ def mol_grid(
             else:
                 img_ext = "png"
                 img_size = size * 2
+            kwargs["size"] = img_size
             if img_folder is not None and guessed_id is not None:
                 img_fn = op.join(img_folder, f"{rec[guessed_id]}.{img_ext}")
             else:
                 img_fn = None
             img_opt = " ".join([f'{k}="{str(v)}"' for k, v in img_opt.items()])
-            mol_img = MolImage(
-                mol, svg=svg, size=img_size, hlsss=hlsss_smi, options=img_opt, **kwargs
-            )
+            mol_img = MolImage(mol, svg=svg, hlsss=hlsss_smi, options=img_opt, **kwargs)
             if img_fn is not None:
                 mol_img.save(img_fn)
             cell = mol_img.tag
@@ -603,11 +699,26 @@ def write_mol_grid(
     KWargs:
         alt_text: whether to include Smiles (default) or the MolBlock as alt text.
             Use e.g. the firefox extension `Copy Alt Text` to copy the alt text.
+
+    Image format options:
+        There are two ways to format the structure images:
+        1. Use the `size` and `use_colors` "quick access" options.
+        2. Pass a DrawingOptions dictionary as `drawing_options`. Use the function init_draw_options() to create a dict with default values.
+        When the second option is used, the `size` and `use_colors` options are ignored.
+        Each of the options can be either a single value or a list of values. If a list is passed,
+        it has to have the same length as the number of Smiles columns.
+
+        size: Size of the image in pixels (default=300).
+        use_colors: Whether to use colors for atoms (default=True).
+        drawing_options: instance of `DrawingOptions` for the structure display.
     """
 
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
+
+    if "size" not in kwargs:
+        kwargs["size"] = 300
 
     # Need to check here, because the `add_image_tag` function will run in a try / except block:
     alt_text = kwargs.get("alt_text", "smiles").lower()
@@ -630,7 +741,6 @@ def write_mol_grid(
         smiles_col=smiles_col,
         mol_col=mol_col,
         id_col=id_col,
-        size=IMG_GRID_SIZE,
         as_html=False,
         img_folder=img_folder,
         svg=svg,
@@ -652,7 +762,9 @@ def write_mol_table(
     id_col="Compound_Id",
     smiles_col: str | List[str] = "Smiles",
     size: int | List[int] = 300,
-    svg=None,
+    use_colors: bool | List[bool] = True,
+    drawing_options: Optional[DrawingOptions | List[DrawingOptions]] = None,
+    svg: Optional[bool] = None,
     formatter=None,
     **kwargs,
 ):
@@ -665,12 +777,25 @@ def write_mol_table(
         fn: Filename to write.
         smiles_col: Column name or list of column names with Smiles.
             Each column will be displayed as a separate molecule.
-        size: Size of the image in pixels (default=300). If this is a list,
-            each column will be displayed with the corresponding size.
 
     KWargs:
         alt_text: whether to include Smiles (default) or the MolBlock as alt text.
             Use e.g. the firefox extension `Copy Alt Text` to copy the alt text.
+
+    Image format options:
+        There are two ways to format the structure images:
+        1. Use the `size` and `use_colors` "quick access" options.
+        2. Pass a DrawingOptions dictionary as `drawing_options`. Use the function init_draw_options() to create a dict with default values.
+        When the second option is used, the `size` and `use_colors` options are ignored.
+        Each of the options can be either a single value or a list of values. If a list is passed,
+        it has to have the same length as the number of Smiles columns.
+
+        size: Size of the image in pixels (default=300). If this is a list,
+            each image column will be displayed with the corresponding size.
+        use_colors: Whether to use colors for atoms (default=True). If this is a list,
+            each image column will be displayed with the corresponding setting.
+        drawing_options: instance of `DrawingOptions` for the structure display.
+            If this is a list, each image column will be displayed with the corresponding options.
     """
     df = df.copy()
     header = kwargs.pop("header", None)
@@ -693,6 +818,10 @@ def write_mol_table(
         assert sc in df.keys(), f"Column {sc} not found in DataFrame."
     if isinstance(size, int):
         size = [size] * len(smiles_col)
+    if isinstance(use_colors, bool):
+        use_colors = [use_colors] * len(smiles_col)
+    if not isinstance(drawing_options, list):
+        drawing_options = [drawing_options] * len(smiles_col)
     assert len(size) == len(smiles_col)
     assert id_col in df.keys(), f"Id Column {id_col} not found in DataFrame."
 
@@ -704,7 +833,14 @@ def write_mol_table(
     # Add the image tags
     for idx, sc in enumerate(smiles_col):
         df = add_image_tag(
-            df, f"{sc}_Mol", size=size[idx], svg=svg, smiles_col=sc, **kwargs
+            df,
+            f"{sc}_Mol",
+            size=size[idx],
+            use_colors=use_colors[idx],
+            drawing_options=drawing_options[idx],
+            svg=svg,
+            smiles_col=sc,
+            **kwargs,
         )
 
     # Replace the positions of the Smiles columns with the Mol columns:
@@ -713,7 +849,10 @@ def write_mol_table(
 
     # Drop the Smiles columns:
     df = df[cols]
-
+    if formatter is None:
+        # Create a default formatter that displays floats with 3 decimals:
+        float_cols = [x for x in df.keys() if df[x].dtype == "float64"]
+        formatter = {x: "{:.3f}" for x in float_cols}
     style = (
         df.style.format(formatter=formatter, escape=None)
         .set_table_styles([templ.TABLE, templ.HEADERS])
