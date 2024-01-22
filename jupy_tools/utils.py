@@ -968,8 +968,31 @@ def murcko_from_smiles(
     return df
 
 
-def sss(df: pd.DataFrame, query: str, smiles_col="Smiles") -> pd.DataFrame:
+def sss(
+    df: pd.DataFrame,
+    query: str,
+    smiles_col="Smiles",
+    is_smarts=False,
+    add_h: Union[str, bool] = False,
+) -> pd.DataFrame:
     """Substructure search on a Smiles column of the DataFrame.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The dataframe to apply the function to.
+    query: str
+        The query Smiles or Smarts.
+    smiles_col: str
+        The name of the column containing the Smiles strings.
+    is_smarts: bool
+        Whether the query is a Smarts string (default: False, meaning: query is a Smiles string).
+    add_h: bool or str
+        Whether to add explicit hydrogens to the molecules before the search.
+        Possible values: False, True, "auto".
+        If "auto" is used, hydrogens are added only if the query contains explicit hydrogens.
+        Default: False.
+
     Returns a new DF with only the matches."""
 
     def _sss(smi, qm):
@@ -979,11 +1002,19 @@ def sss(df: pd.DataFrame, query: str, smiles_col="Smiles") -> pd.DataFrame:
             return False
         if m is None:
             return False
+        if add_h:
+            m = Chem.AddHs(m)
         if m.HasSubstructMatch(qm):
             return True
         return False
 
-    q = Chem.MolFromSmiles(query)
+    if add_h == "auto":
+        if "#1" in query:
+            add_h = True
+    if is_smarts:
+        q = Chem.MolFromSmarts(query)
+    else:
+        q = Chem.MolFromSmiles(query)
     df = df.copy()
     if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
         df["Found"] = df[smiles_col].progress_apply(lambda x: _sss(x, q))

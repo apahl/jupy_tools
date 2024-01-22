@@ -825,6 +825,31 @@ def add_func_clusters(
     return result
 
 
+def recalc_cluster_high(df: pd.DataFrame) -> pd.DataFrame:
+    """Recalcs the cluster with the highest Sim for each compound.
+    Uses the clusters available in the DataFrame."""
+    df = df.copy()
+    # Drop previous Cluster_High and Cluster_Sim columns, if they are still present:
+    df = df.drop(["Cluster_High", "Cluster_Sim"], axis=1, errors="ignore")
+    clusters = [x for x in df if x.startswith("Cluster_")]
+    most_sim = {"Well_Id": [], "Cluster_High": [], "Cluster_Sim": []}
+    for _, rec in df.iterrows():
+        sim = rec[clusters].max()
+        for cl in clusters:
+            if is_close(rec[cl], sim):
+                break
+        else:
+            # Fail-safe for comparing floats for equality.
+            raise FloatingPointError(f"Could not find Sim {sim}.")
+        most_sim["Well_Id"].append(rec["Well_Id"])
+        most_sim["Cluster_High"].append(cl[8:])
+        most_sim["Cluster_Sim"].append(sim)
+
+    assert len(most_sim["Well_Id"]) == len(df)
+    result = df.merge(pd.DataFrame(most_sim), on="Well_Id", how="left")
+    return result
+
+
 def cluster_features(df: pd.DataFrame, fraction: float):
     """The list of parameters that defines a cluster.
 
