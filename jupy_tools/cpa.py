@@ -792,6 +792,7 @@ def add_func_clusters(
         func_clusters = clusters.copy()
     if func_clusters is None:
         raise ValueError("No functional clusters found.")
+    print(f"Adding {len(func_clusters)} functional clusters: {func_clusters}")
 
     result = df.copy()
     for cl in func_clusters:

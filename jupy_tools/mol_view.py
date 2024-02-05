@@ -826,7 +826,7 @@ def write_mol_table(
     assert id_col in df.keys(), f"Id Column {id_col} not found in DataFrame."
 
     cols = df.keys()
-    # When there is only one structure columns, put it in front:
+    # When there is only one structure column, put it in front:
     if len(smiles_col) == 1:
         cols = [smiles_col[0]] + [x for x in cols if x != smiles_col[0]]
 
