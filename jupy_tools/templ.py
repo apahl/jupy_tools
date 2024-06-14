@@ -143,13 +143,13 @@ TABLE_SIMPLE = """
     background-color: #FFFFFF;
     text-align: left;
   }
-</style>
+  </style>
   </head>
   <body>
     $$$intro
     $$$table
   </body>
-  </html>"""
+</html>"""
 
 
 TBL_JAVASCRIPT = """<script type="text/javascript">

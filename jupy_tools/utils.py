@@ -1002,7 +1002,7 @@ def sss(
             return False
         if m is None:
             return False
-        if add_h:
+        if add_h is True:
             m = Chem.AddHs(m)
         if m.HasSubstructMatch(qm):
             return True

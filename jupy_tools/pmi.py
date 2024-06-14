@@ -10,9 +10,10 @@ import numpy as np
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors as rdMolDesc
+from typing import Tuple
 
 
-def get_stereo_counts(mol) -> (int, int, bool):
+def get_stereo_counts(mol) -> Tuple[int, int, bool]:
     """Count the number of specified and unspecified atom stereo centers.
     Only chirality at carbons is considered.
     Returns a tuple of (num_specified: int, num_specified: int, is_diastereomer: bool) counts.
@@ -37,7 +38,7 @@ def get_stereo_counts(mol) -> (int, int, bool):
     return num_spec, num_unspec, False
 
 
-def gen_3d(mol: Chem.Mol, n_conformers: int) -> (Chem.Mol, List[int]):
+def gen_3d(mol: Chem.Mol, n_conformers: int) -> Tuple[Chem.Mol, List[int]]:
     """
     Generate 3D coordinates for a molecule.
     Generates n_conformers of the molecule and performs optimization on them.
@@ -61,7 +62,7 @@ def gen_3d(mol: Chem.Mol, n_conformers: int) -> (Chem.Mol, List[int]):
     return mh, conf_res
 
 
-def calc_pmi(mol: Chem.Mol, n_conformers: int, avg=3) -> (float, float):
+def calc_pmi(mol: Chem.Mol, n_conformers: int, avg=3) -> Tuple[float, float]:
     """Calculates the Principal Moment of Inertia (PMI) of a molecule.
     The values are calculated for each conformer of the molecule `avg` times.
     Conformers that did not converge in the optimization are skipped.

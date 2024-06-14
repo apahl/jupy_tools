@@ -605,7 +605,8 @@ def mol_grid(
             if ylim is not None:
                 plt.ylim(ylim)
             bf = b64_fig(chart)
-            chart_tag = f"""<img width="{IMG_GRID_SIZE}" src="data:image/png;base64,{bf}" alt="Chart"/>"""
+            img_width = IMG_GRID_SIZE + int(IMG_GRID_SIZE * 0.2)
+            chart_tag = f"""<img width="{img_width}" src="data:image/png;base64,{bf}" alt="Chart"/>"""
             chart_cells.extend(templ.td(chart_tag, td_opt))
 
             plt.clf()
