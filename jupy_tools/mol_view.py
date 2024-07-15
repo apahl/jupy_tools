@@ -305,11 +305,11 @@ class MolImage:
         if self.svg:
             img = bytes(self.txt, encoding="iso-8859-1")
             img = b64_mol(img)
-            tag = """<img {} src="data:image/svg+xml;base64,{}" alt="{}"/>"""
-            self.tag = tag.format(options, img, self.alt_text)
+            self.b64 = f'data:image/svg+xml;base64,{img}'
         else:
-            tag = """<img {} src="data:image/png;base64,{}" alt="{}"/>"""
-            self.tag = tag.format(options, b64_mol(img), self.alt_text)
+            img = b64_mol(img)
+            self.b64 = f'data:image/png;base64,{img}'
+        self.tag = f"""<img {options} src="{self.b64}" alt="{self.alt_text}"/>"""
 
     def save(self, fn):
         if (self.svg and not fn.lower().endswith("svg")) or (
