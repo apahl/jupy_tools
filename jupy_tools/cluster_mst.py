@@ -132,7 +132,7 @@ class ClusterMST:
         for idx1 in range(fps_len-1):
             for idx2 in range(idx1+1, fps_len):
                 sim = DataStructs.TanimotoSimilarity(self.fps[idx1], self.fps[idx2])
-                g.add_edge(self.ids[idx1], self.ids[idx2], weight=10*(1-sim), len=10*(1-sim))
+                g.add_edge(self.ids[idx1], self.ids[idx2], weight=1+9*(1-sim), len=1+9*(1-sim))
                 entries.add(self.ids[idx1])
                 entries.add(self.ids[idx2])
         self.mst = nx.minimum_spanning_tree(g)
