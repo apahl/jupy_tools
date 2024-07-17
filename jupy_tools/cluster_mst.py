@@ -4,17 +4,11 @@ The resulting tree displays the activity of the compounds in a continuous color 
 Module requirements: RDKit, NetworkX, pygraphviz, holoviews and Pandas."""
 
 import pandas as pd
-# import numpy as np
 
 from rdkit import DataStructs
 from rdkit.Chem import AllChem as Chem
 
 import networkx as nx
-
-import holoviews as hv
-hv.extension("bokeh")
-
-from bokeh.models import HoverTool
 
 from jupy_tools import utils as u, mol_view as mv
 
@@ -25,37 +19,6 @@ FPDICT["ECFC4"] = lambda m: Chem.GetMorganFingerprint(m, 2)
 FPDICT["ECFC6"] = lambda m: Chem.GetMorganFingerprint(m, 3)
 FPDICT["ECFP4"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 2, nBits=NBITS)
 FPDICT["ECFP6"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 3, nBits=NBITS)
-
-def struct_hover(id_col, cols):
-    """Create a structure tooltip that can be used in Holoviews.
-    Takes a MolFrame instance as parameter."""
-    add_cols = []
-    if cols is None:
-        cols = []
-    if isinstance(cols, str):
-        cols = [cols]
-    for col in cols:
-        add_cols.append(
-            f"""<div>
-                    <span style="font-size: 12px;">{col}: @{col}</span>
-                </div>"""
-        )
-    add_cols_txt = "\n".join(add_cols)
-    # <img src="@Image" alt="Mol" width="70%"><br>
-    hover = HoverTool(
-        tooltips=f"""
-            <div>
-                <div>
-                    @Image<br>
-                <div>
-                <div>
-                    <span style="font-size: 12px; font-weight: bold;">@{id_col}</span>
-                </div>
-                {add_cols_txt}
-            </div>
-        """
-    )
-    return hover
 
 
 class ClusterMST:
