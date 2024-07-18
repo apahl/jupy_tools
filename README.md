@@ -114,6 +114,7 @@ git clone https://github.com/apahl/jupy_tools
 cd jupy_tools
 
 conda create -n chem python=3.11 rdkit pillow cairocffi pandas matplotlib seaborn networkx python-graphviz scikit-learn scipy
+conda activate chem
 
 pip install . 
 ```
