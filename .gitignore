@@ -1,6 +1,15 @@
 __pycache__/
 .ipynb_checkpoints/
 .vscode/
+
+env/
+build/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
 python_scripts/stand_struct_temp.py
 snippets.txt
 tags

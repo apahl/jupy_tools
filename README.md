@@ -92,4 +92,28 @@ options:
 
 # Installation
 
-Recommended way of installation: see [mol_frame](https://github.com/apahl/mol_frame#installation)
+1. Download the repository
+1. Change into the dowloaded directory
+1. Create and activate a Python virtual environment, e.g. with conda
+1. Pip-install the dependencies and the package
+
+```Bash
+git clone https://github.com/apahl/jupy_tools
+cd jupy_tools
+
+conda create -n chem python=3.11
+conda activate chem
+
+pip install .
+```
+
+Or install the dependencies also with conda and then pip-install just the package:
+
+```Bash
+git clone https://github.com/apahl/jupy_tools
+cd jupy_tools
+
+conda create -n chem python=3.11 rdkit pillow cairocffi pandas matplotlib seaborn networkx python-graphviz scikit-learn scipy
+
+pip install . 
+```

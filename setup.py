@@ -17,7 +17,7 @@ setup(
         "seaborn",
         "cairocffi",
         "networkx",
-        "pygraphviz",
+        "graphviz",
         "scikit-learn",
         "scipy",
     ],
