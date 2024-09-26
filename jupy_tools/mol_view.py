@@ -456,7 +456,7 @@ def mol_grid(
     Returns:
         HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page.
     """
-
+    fbgc = "#f4f4f4"  # field background color
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
@@ -615,7 +615,7 @@ def mol_grid(
 
         if len(props) > 0:
             for prop_no, prop in enumerate(props):
-                prop_opt = {"style": "text-align: left;"}
+                prop_opt = {"style": f"text-align: left; background-color: {fbgc};"}
                 val_opt = {"style": "text-align: left;"}
                 prop_cells = []
                 prop_val = ""
