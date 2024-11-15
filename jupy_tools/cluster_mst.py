@@ -7,6 +7,7 @@ import pandas as pd
 
 from rdkit import DataStructs
 from rdkit.Chem import AllChem as Chem
+from rdkit.Chem import rdFingerprintGenerator
 
 import networkx as nx
 
@@ -15,10 +16,18 @@ from jupy_tools import utils as u, mol_view as mv
 NBITS = 1024
 FPDICT = {}
 
-FPDICT["ECFC4"] = lambda m: Chem.GetMorganFingerprint(m, 2)
-FPDICT["ECFC6"] = lambda m: Chem.GetMorganFingerprint(m, 3)
-FPDICT["ECFP4"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 2, nBits=NBITS)
-FPDICT["ECFP6"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 3, nBits=NBITS)
+FP4 = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=NBITS)
+FP6 = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=NBITS)
+
+# FPDICT["ECFC4"] = lambda m: Chem.GetMorganFingerprint(m, 2)
+# FPDICT["ECFC6"] = lambda m: Chem.GetMorganFingerprint(m, 3)
+# FPDICT["ECFP4"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 2, nBits=NBITS)
+# FPDICT["ECFP6"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 3, nBits=NBITS)
+
+FPDICT["ECFC4"] = lambda m: FP4.GetCountFingerprint(m)
+FPDICT["ECFC6"] = lambda m: FP6.GetCountFingerprint(m)
+FPDICT["ECFP4"] = lambda m: FP4.GetFingerprint(m)
+FPDICT["ECFP6"] = lambda m: FP6.GetFingerprint(m)
 
 
 class ClusterMST:

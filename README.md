@@ -1,5 +1,7 @@
 # jupy_tools
 
+*Update 13-Nov-2024: To stay compatible with the latest RDKit, the structure standardization tools are updated, using the rdXXX modules. This also requires the removal of the `legacy` tautomerization option from the `stand_struct.py` script. If you want to keep using the `legacy` mode, you need to checkout an older version of this repository and use an older version of RDKit, e.g. of 2023.*
+
 (Again, I am showing everyone how untalented I am in naming things)
 
 A set of convenience tools for my work with JupyterLab.  

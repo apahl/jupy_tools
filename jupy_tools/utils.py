@@ -31,21 +31,19 @@ try:
     import rdkit.Chem.Descriptors as Desc
     from rdkit.Chem.Scaffolds import MurckoScaffold
 
-    # from rdkit.Chem.MolStandardize import rdMolStandardize
-    # from rdkit.Chem.MolStandardize.validate import Validator
-    from rdkit.Chem.MolStandardize.charge import Uncharger
-    from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
-    from rdkit.Chem.MolStandardize.standardize import Standardizer
-    from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
+    from rdkit.Chem.MolStandardize.rdMolStandardize import (
+        CleanupInPlace,
+        RemoveFragmentsInPlace,
+        IsotopeParentInPlace,
+        TautomerParentInPlace,
+        ChargeParentInPlace,
+        
+        StereoParentInPlace
+    )
     from rdkit import rdBase
 
     rdBase.DisableLog("rdApp.info")
     # rdBase.DisableLog("rdApp.warn")
-
-    molvs_s = Standardizer()
-    molvs_l = LargestFragmentChooser()
-    molvs_u = Uncharger()
-    molvs_t = TautomerCanonicalizer(max_tautomers=100)
     RDKIT = True
 
 except ImportError:
@@ -116,6 +114,12 @@ def timestamp(show=True):
         print("Timestamp:", time.strftime("%d-%b-%Y %H:%M:%S"))
     else:
         return time.strftime("%d-%b-%Y %H:%M:%S")
+
+
+def check_mol(mol: Mol) -> bool:
+    """Check whether mol is indeed an instance of RDKit mol object,
+    and not np.nan or None."""
+    return isinstance(mol, Mol)    
 
 
 def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
@@ -462,32 +466,33 @@ def standardize_mol(
     standardize=True,
     remove_stereo=False,
     canonicalize_tautomer=False,
-):
+) -> str:
     """Standardize the molecule structures.
     Returns:
     ========
     Smiles of the standardized molecule. NAN for failed molecules."""
 
-    if mol is np.nan or mol is None:
+    if not check_mol(mol):
+        return np.nan
+    CleanupInPlace(mol)
+    if not check_mol(mol):
         return np.nan
     if largest_fragment:
-        mol = molvs_l.choose(mol)
+        RemoveFragmentsInPlace(mol)
+        if not check_mol(mol):
+            return np.nan
     if uncharge:
-        mol = molvs_u.uncharge(mol)
-    if standardize:
-        # Apparently, this may fail:
-        try:
-            mol = molvs_s.standardize(mol)
-        except:
+        ChargeParentInPlace(mol)
+        if not check_mol(mol):
             return np.nan
     if remove_stereo:
-        mol = molvs_s.stereo_parent(mol)
+        StereoParentInPlace(mol)
+        if not check_mol(mol):
+            return np.nan
     if canonicalize_tautomer:
-        mol = molvs_t.canonicalize(mol)
-    # mol = largest.choose(mol)
-    # mol = uncharger.uncharge(mol)
-    # mol = normal.normalize(mol)
-    # mol = enumerator.Canonicalize(mol)
+        TautomerParentInPlace(mol)        
+        if not check_mol(mol):
+            return np.nan
     return mol_to_smiles(mol)
 
 

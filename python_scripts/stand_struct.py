@@ -27,22 +27,32 @@ from rdkit.Chem import Mol
 import rdkit.Chem.Descriptors as Desc
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
-from rdkit.Chem.MolStandardize.charge import Uncharger
-from rdkit.Chem.MolStandardize.fragment import LargestFragmentChooser
-from rdkit.Chem.MolStandardize.standardize import Standardizer
+# from rdkit.Chem.MolStandardize.rdMolStandardize import (
+#     TautomerEnumerator,
+#     CleanupParameters,
+# )
 from rdkit.Chem.MolStandardize.rdMolStandardize import (
-    TautomerEnumerator,
-    CleanupParameters,
+    CleanupInPlace,
+    RemoveFragmentsInPlace,
+    IsotopeParentInPlace,
+    TautomerParentInPlace,
+    ChargeParentInPlace,
+    
+    StereoParentInPlace
 )
 
-# Legacy tautomer canonicalizer:
-from rdkit.Chem.MolStandardize.tautomer import TautomerCanonicalizer
 
 from rdkit import RDLogger
 
 LOG = RDLogger.logger()
 LOG.setLevel(RDLogger.CRITICAL)
 DEBUG = False
+
+
+def check_mol(mol: Mol) -> bool:
+    """Check whether mol is indeed an instance of RDKit mol object,
+    and not np.nan or None."""
+    return isinstance(mol, Mol)    
 
 
 # Code for legacy tautomer canonicalizer:
@@ -216,21 +226,15 @@ def process(
         "none",
         "rdkit",
         "cxcalc",
-        "legacy",
     }, "Invalid canonicalization method, must be one of 'none', 'rdkit', 'cxcalc'"
     medchem_atoms = {1, 5, 6, 7, 8, 9, 15, 16, 17, 35, 53}  # 5: Boron
-    molvs_s = Standardizer()
-    molvs_l = LargestFragmentChooser()
-    molvs_u = Uncharger()
     # Setting CleanUpParameters to retain stereochem information:
     # This only works with the new tautomer enumerator (option `--canon=rdkit`).
-    cup = CleanupParameters()
-    cup.tautomerReassignStereo = True
-    cup.tautomerRemoveBondStereo = False
-    cup.tautomerRemoveSp3Stereo = False
-    te = TautomerEnumerator(cup)
-    # Legacy tautomer canonicalizer:
-    molvs_t = TautomerCanonicalizer(max_tautomers=100)
+    # cup = CleanupParameters()
+    # cup.tautomerReassignStereo = True
+    # cup.tautomerRemoveBondStereo = False
+    # cup.tautomerRemoveSp3Stereo = False
+    # te = TautomerEnumerator(cup)
 
     deglyco_str = ""
     if deglyco:
@@ -240,8 +244,6 @@ def process(
         canon_str = "_nocanon"
     elif canon == "rdkit":
         canon_str = "_rdkit"
-    elif canon == "legacy":
-        canon_str = "_legacy"
     elif canon == "cxcalc":
         if len(idcol) == 0:
             print(
@@ -338,7 +340,7 @@ def process(
         for rec in reader:
             ctr["In"] += 1
             mol = rec["Mol"]
-            if mol is None:
+            if not check_mol(mol):
                 ctr["Fail_NoMol"] += 1
                 continue
             if first_mol:
@@ -373,21 +375,26 @@ def process(
                 d[prop] = ""
 
             # Standardization
-            mol = molvs_l.choose(mol)
-            mol = molvs_u.uncharge(mol)
-            # Apparently, this may fail:
-            try:
-                mol = molvs_s.standardize(mol)
-            except:
+
+            CleanupInPlace(mol)
+            if not check_mol(mol):
+                ctr["Fail_NoMol"] += 1
+                continue
+            RemoveFragmentsInPlace(mol)
+            if not check_mol(mol):
+                ctr["Fail_NoMol"] += 1
+                continue
+            ChargeParentInPlace(mol)
+            if not check_mol(mol):
                 ctr["Fail_NoMol"] += 1
                 continue
 
             # Racemize all stereocenters
             if "rac" in out_type:
-                mol = molvs_s.stereo_parent(mol)
-            if mol is None:
-                ctr["Fail_NoMol"] += 1
-                continue
+                StereoParentInPlace(mol)
+                if not check_mol(mol):
+                    ctr["Fail_NoMol"] += 1
+                    continue
 
             if deglyco:
                 # Deglycosylation should not lead to failed mols.
@@ -399,7 +406,7 @@ def process(
                 except ValueError:
                     ctr["Fail_Deglyco"] += 1
                     mol = mol_copy
-                if mol is None:
+                if not check_mol(mol):
                     ctr["Fail_Deglyco"] += 1
                     mol = mol_copy
                 if mol.GetNumAtoms() < num_atoms:
@@ -407,7 +414,7 @@ def process(
 
             if "murcko" in out_type:
                 mol = MurckoScaffold.GetScaffoldForMol(mol)
-                if mol is None:
+                if not check_mol(mol):
                     ctr["Fail_NoMol"] += 1
                     continue
 
@@ -445,42 +452,8 @@ def process(
 
             if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
-                mol = te.Canonicalize(mol)
-                if mol is None:
-                    ctr["Fail_NoMol"] += 1
-                    continue
-                try:
-                    inchi = Chem.inchi.MolToInchiKey(mol)
-                except:
-                    ctr["Fail_NoMol"] += 1
-                    continue
-                if not keep_dupl:
-                    # When canonicalization IS performed,
-                    # we have to check for duplicates now:
-                    if inchi in inchi_keys:
-                        ctr["Duplicates"] += 1
-                        continue
-                    inchi_keys.add(inchi)
-                d["InChIKey"] = inchi
-
-            # Using RDKit legacy tautomer canonicalizer for compatibility with previous versions:
-            if canon == "legacy":
-                # Late canonicalization, because it is so expensive:
-                mol_copy = deepcopy(mol)  # copy the mol to restore it after a timeout
-                timed_out = True
-                with TimeOut(3):
-                    try:
-                        mol = molvs_t.canonicalize(mol)
-                        timed_out = False
-                    except:
-                        # in case of a canonicalization error, restore original mol
-                        mol = mol_copy
-                if timed_out:
-                    ctr[
-                        "Timeout"
-                    ] += 1  # increase the counter but do not fail the entry
-                    mol = mol_copy  # instead, restore from the copy
-                if mol is None:
+                TautomerParentInPlace(mol)        
+                if not check_mol(mol):
                     ctr["Fail_NoMol"] += 1
                     continue
                 try:
