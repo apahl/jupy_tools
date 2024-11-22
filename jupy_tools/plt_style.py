@@ -5,10 +5,10 @@ My favourite Matplotlib styles."""
 
 import matplotlib.pyplot as plt
 
-plt.style.use("seaborn-whitegrid")
+plt.style.use("seaborn-v0_8-whitegrid")
 # plt.style.use("seaborn-white")
 # plt.style.use("seaborn-pastel")
-plt.style.use("seaborn-poster")  # seaborn-talk
+plt.style.use("seaborn-v0_8-poster")  # seaborn-talk
 plt.rcParams["axes.titlesize"] = 25
 plt.rcParams["axes.labelsize"] = 25
 plt.rcParams["xtick.labelsize"] = 20

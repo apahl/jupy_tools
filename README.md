@@ -43,7 +43,7 @@ The output is always a TSV file, various options are available, please have a lo
 
 ```
 $ stand_struct --help
-usage: stand_struct [-h] [--canon {none,rdkit,cxcalc,legacy}] [--idcol IDCOL] [--nocanon] [--min_heavy_atoms MIN_HEAVY_ATOMS]
+usage: stand_struct [-h] [--canon {none,rdkit,cxcalc}] [--idcol IDCOL] [--nocanon] [--min_heavy_atoms MIN_HEAVY_ATOMS]
                     [--max_heavy_atoms MAX_HEAVY_ATOMS] [-d] [-c COLUMNS] [-n N] [--deglyco] [-v]
                     in_file {full,fullrac,medchem,medchemrac,fullmurcko,medchemmurcko,fullracmurcko,medchemracmurcko}
 
@@ -73,9 +73,9 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --canon {none,rdkit,cxcalc,legacy}
+  --canon {none,rdkit,cxcalc}
                         Select an algorithm for tautomer generation. `rdkit` uses the new C++ implementation from `rdMolStandardize.TautomerEnumerator`,
-                        `legacy` uses the older canonicalizer from `MolStandardize.tautomer`. `cxcalc` requires the ChemAxon cxcalc tool to be installed.
+                        `cxcalc` requires the ChemAxon cxcalc tool to be installed.
   --idcol IDCOL         Name of the column that contains a unique identifier for the dataset. Required for canonicalization with `cxcalc`.
   --nocanon             Do not perform canonicalization. DEPRECATED - use `--canon=none` instead.
   --min_heavy_atoms MIN_HEAVY_ATOMS

@@ -384,7 +384,12 @@ def process(
             if not check_mol(mol):
                 ctr["Fail_NoMol"] += 1
                 continue
-            ChargeParentInPlace(mol)
+            try:
+                # This can give an exception
+                ChargeParentInPlace(mol)
+            except:
+                ctr["Fail_NoMol"] += 1
+                continue
             if not check_mol(mol):
                 ctr["Fail_NoMol"] += 1
                 continue
