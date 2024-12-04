@@ -170,7 +170,13 @@ def has_isotope(mol: Mol) -> bool:
 
 def csv_supplier(fo, dialect):
     reader = csv.DictReader(fo, dialect=dialect)
+    columns = reader.fieldnames
     for row in reader:
+        for col in columns:
+            # Clean up the strings:
+            row[col] = row[col].strip()
+            row[col] = row[col].replace("\n", "; ")
+            row[col] = row[col].replace("\r\n", "; ")
         if len(row["Smiles"]) == 0:
             yield {"Mol": None}
             continue
@@ -289,7 +295,7 @@ def process(
     first_dot = fn[0].find(".")
     fn_base = fn[0][:first_dot]
     out_fn = f"{fn_base}_{out_type}{deglyco_str}{canon_str}{dupl_str}{min_ha_str}{max_ha_str}.tsv"
-    outfile = open(out_fn, "w")
+    outfile = open(out_fn, "w", encoding="utf-8")
     if canon == "cxcalc":
         cx_calc_input_fn = f"{fn_base}_cxcalc_input.csv"
         cx_calc_result_fn = f"{fn_base}_cxcalc_result.tsv"
@@ -331,7 +337,7 @@ def process(
                 mode = " (gzipped)"
                 file_obj = gzip.open(f, mode="rt")
             else:
-                file_obj = open(f, "r")
+                file_obj = open(f, "r", encoding="utf-8")
             reader = csv_supplier(file_obj, dialect="excel-tab")
         else:
             raise ValueError(f"Unknown input file format: {f}")
