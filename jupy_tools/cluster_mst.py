@@ -13,28 +13,33 @@ import networkx as nx
 
 from jupy_tools import utils as u, mol_view as mv
 
-NBITS = 1024
+NBITS = 2048
 FPDICT = {}
 
-FP4 = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=NBITS)
-FP6 = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=NBITS)
+EFP4 = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=NBITS)
+EFP6 = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=NBITS)
+FFP4 = rdFingerprintGenerator.GetMorganGenerator(
+    radius=2, fpSize=NBITS,
+    atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+)
+FFP6 = rdFingerprintGenerator.GetMorganGenerator(
+    radius=3, fpSize=NBITS,
+    atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+)
 
-# FPDICT["ECFC4"] = lambda m: Chem.GetMorganFingerprint(m, 2)
-# FPDICT["ECFC6"] = lambda m: Chem.GetMorganFingerprint(m, 3)
-# FPDICT["ECFP4"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 2, nBits=NBITS)
-# FPDICT["ECFP6"] = lambda m: Chem.GetMorganFingerprintAsBitVect(m, 3, nBits=NBITS)
-
-FPDICT["ECFC4"] = lambda m: FP4.GetCountFingerprint(m)
-FPDICT["ECFC6"] = lambda m: FP6.GetCountFingerprint(m)
-FPDICT["ECFP4"] = lambda m: FP4.GetFingerprint(m)
-FPDICT["ECFP6"] = lambda m: FP6.GetFingerprint(m)
+FPDICT["ECFC4"] = lambda m: EFP4.GetCountFingerprint(m)
+FPDICT["ECFC6"] = lambda m: EFP6.GetCountFingerprint(m)
+FPDICT["ECFP4"] = lambda m: EFP4.GetFingerprint(m)
+FPDICT["ECFP6"] = lambda m: EFP6.GetFingerprint(m)    
+FPDICT["FCFP4"] = lambda m: FFP4.GetFingerprint(m)
+FPDICT["FCFP6"] = lambda m: FFP6.GetFingerprint(m)    
 
 
 class ClusterMST:
     """ClusterMST class.
     Structures are expected as Smiles."""
     def __init__(
-            self, df, id_col, act_col, top_n_act: int, reverse=False, sim_cutoff=0.6, num_sim=50, smiles_col="Smiles", fp="ECFC4"
+            self, df, id_col, act_col, top_n_act: int, reverse=False, sim_cutoff=0.6, num_sim=10, smiles_col="Smiles", fp="ECFC4"
         ):
         """Initialize the class.
         
@@ -67,7 +72,7 @@ class ClusterMST:
         """Calculate the selected fingerprints."""
         # self.fps = [Chem.GetMorganFingerprint(Chem.MolFromSmiles(smi), 2) for smi in self.df[self.smiles_col]]
         fp_call = FPDICT[self.fp_method]
-        self.fps = [fp_call(Chem.MolFromSmiles(smi)) for smi in self.df[self.smiles_col]]
+        self.fps = {cpd_id: fp_call(Chem.MolFromSmiles(smi)) for cpd_id, smi in self.df[[self.id_col, self.smiles_col]].values}
         if len(self.ids) != len(self.fps):
             raise ValueError("The number of IDs and fingerprints does not match.")
     
@@ -75,25 +80,33 @@ class ClusterMST:
         """Calculate the Minimum Spanning Tree."""
 
         self._calc_fps()
+        top_n_ids = self.df.head(self.top_n_act)[self.id_col].copy().tolist()
         sims_full = []
-        fps_len = len(self.fps)
-        for idx1 in range(fps_len-1):
-            for idx2 in range(idx1+1, fps_len):
-                sim = DataStructs.TanimotoSimilarity(self.fps[idx1], self.fps[idx2])
-                # Similarity both ways:
-                sims_full.append((self.ids[idx1], self.ids[idx2], sim))
-                sims_full.append((self.ids[idx2], self.ids[idx1], sim))
+        for id1 in top_n_ids:
+            for id2 in self.fps.keys():
+                if id1 == id2:
+                    continue
+                sim = DataStructs.TanimotoSimilarity(self.fps[id1], self.fps[id2])
+                if sim >= self.sim_cutoff:
+                    # Similarity both ways:
+                    sims_full.append((id1, id2, sim))
+                    # sims_full.append((self.ids[idx2], self.ids[idx1], sim))
                 
         df_sims = pd.DataFrame(sims_full, columns=[self.id_col+"_1", self.id_col+"_2", "Similarity"])
-        df_sims = df_sims[df_sims["Similarity"] >= self.sim_cutoff]
+        # df_sims = df_sims[df_sims["Similarity"] >= self.sim_cutoff]
         df_sims = df_sims.sort_values([f"{self.id_col}_1", "Similarity"], ascending=[True, False]).reset_index(drop=True)
-        id_set = set()
-        for idx, rec in self.df.iterrows():
-            if idx >= self.top_n_act - 1:
-                break
-            tmp = df_sims[df_sims[self.id_col+"_1"] == rec[self.id_col]].head(self.num_sim).copy()
-            id_set.add(rec[self.id_col])
-            id_set.update(tmp[self.id_col+"_2"].tolist())
+        # id_set = set()
+        # for idx, rec in self.df.iterrows():
+        #     if idx >= self.top_n_act - 1:
+        #         break
+        #     tmp = df_sims[df_sims[self.id_col+"_1"] == rec[self.id_col]].head(self.num_sim).copy()
+        #     id_set.add(rec[self.id_col])
+        #     id_set.update(tmp[self.id_col+"_2"].tolist())
+        
+        # Keep the top `num_sim` similar compounds for each compound:
+        df_sims = df_sims.groupby(f"{self.id_col}_1").head(self.num_sim).reset_index(drop=True)
+        id_set = set(top_n_ids)
+        id_set.update(df_sims[self.id_col+"_2"].tolist())
         
         self.df = self.df[self.df[self.id_col].isin(id_set)].copy()
         self.ids = self.df[self.id_col].tolist()
@@ -101,12 +114,14 @@ class ClusterMST:
         g = nx.Graph()
         entries = set()
         fps_len = len(self.fps)
-        for idx1 in range(fps_len-1):
-            for idx2 in range(idx1+1, fps_len):
-                sim = DataStructs.TanimotoSimilarity(self.fps[idx1], self.fps[idx2])
-                g.add_edge(self.ids[idx1], self.ids[idx2], weight=1+9*(1-sim), len=1+9*(1-sim))
-                entries.add(self.ids[idx1])
-                entries.add(self.ids[idx2])
+        for id1 in self.fps.keys():
+            for id2 in self.fps.keys():
+                if id1 == id2:
+                    continue
+                sim = DataStructs.TanimotoSimilarity(self.fps[id1], self.fps[id2])
+                g.add_edge(id1, id2, weight=1+9*(1-sim), len=1+9*(1-sim))
+                entries.add(id1)
+                entries.add(id2)
         self.mst = nx.minimum_spanning_tree(g)
         self.pos = nx.planar_layout(self.mst)
         self.pos = nx.kamada_kawai_layout(self.mst, pos=self.pos)

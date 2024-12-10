@@ -28,6 +28,7 @@ try:
     from rdkit.Chem import Mol
     from rdkit.Chem import DataStructs
     from rdkit.Chem import rdqueries
+    from rdkit.Chem import rdFingerprintGenerator
     import rdkit.Chem.Descriptors as Desc
     from rdkit.Chem.Scaffolds import MurckoScaffold
 
@@ -40,6 +41,29 @@ try:
         
         StereoParentInPlace
     )
+    
+    NBITS = 2048
+    FPDICT = {}
+
+    EFP4 = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=NBITS)
+    EFP6 = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=NBITS)
+    FFP4 = rdFingerprintGenerator.GetMorganGenerator(
+        radius=2, fpSize=NBITS,
+        atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+    )
+    FFP6 = rdFingerprintGenerator.GetMorganGenerator(
+        radius=3, fpSize=NBITS,
+        atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+    )
+
+    FPDICT["ECFC4"] = lambda m: EFP4.GetCountFingerprint(m)
+    FPDICT["ECFC6"] = lambda m: EFP6.GetCountFingerprint(m)
+    FPDICT["ECFP4"] = lambda m: EFP4.GetFingerprint(m)
+    FPDICT["ECFP6"] = lambda m: EFP6.GetFingerprint(m)    
+    FPDICT["FCFP4"] = lambda m: FFP4.GetFingerprint(m)
+    FPDICT["FCFP6"] = lambda m: FFP6.GetFingerprint(m)    
+    
+    
     from rdkit import rdBase
 
     rdBase.DisableLog("rdApp.info")
@@ -165,6 +189,29 @@ def fp_ecfc4_from_smiles(smi):
         return np.nan
     fp = Chem.GetMorganFingerprint(mol, 2)
     return fp
+
+
+def add_fps(df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4") -> pd.DataFrame:
+    """Add a Fingerprint column to the DataFrame.
+    Available types: ECFC4 (default), ECFC6, ECFP4, ECFP6.
+    """
+    def _calc_fp(smi):
+        mol = smiles_to_mol(smi)
+        if mol is np.nan:
+            return np.nan
+        fp = FPDICT[fp_type](mol)
+        return fp
+    
+    assert fp_type in FPDICT, f"Unknown fingerprint type: {fp_type}."
+    assert RDKIT, "RDKit not installed."
+    
+    df = df.copy()
+    
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df[fp_col] = df[smiles_col].progress_apply(lambda x: _calc_fp(x))
+    else:
+        df[fp_col] = df[smiles_col].apply(lambda x: _calc_fp(x))
+    return df
 
 
 def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) -> int:
@@ -1033,7 +1080,8 @@ def sss(
 
 
 def sim_search(
-    df: pd.DataFrame, query: str, cutoff: float, fp_col="FP"
+    df: pd.DataFrame, query: str, cutoff: float, 
+    fp_col="FP", fp_type="ECFC4"
 ) -> pd.DataFrame:
     """Tanimoto similarity search on a Fingerprint column (default: `FP`) of the DataFrame.
     Returns a new DF with only the matches."""
@@ -1049,8 +1097,18 @@ def sim_search(
             return True
         return False
 
+    assert fp_type in FPDICT, f"Unknown fingerprint type: {fp_type}."
     assert 0.0 <= cutoff <= 1.0, "Cutoff must be between 0 and 1"
-    fp = fp_ecfc4_from_smiles(query)
+    
+    if isinstance(query, str):
+        qmol = smiles_to_mol(query)
+    else:  # Assume query is already a mol
+        qmol = query
+    if qmol is np.nan:
+        fp = np.nan
+    else:
+        fp = FPDICT[fp_type](qmol)
+
     assert fp is not np.nan, "Query must be a valid SMILES"
     df = df.copy()
     if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
@@ -1060,6 +1118,7 @@ def sim_search(
     else:
         df["Sim"] = df[fp_col].apply(lambda x: DataStructs.TanimotoSimilarity(x, fp))
     df = df[df["Sim"] >= cutoff]
+    df = df.sort_values("Sim", ascending=False)
     if INTERACTIVE:
         info(df, "sim_search")
     return df
