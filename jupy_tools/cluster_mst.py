@@ -58,6 +58,17 @@ class ClusterMST:
         self.reverse = reverse
         # After the processing, self.df will also contain the graph coordinates
         self.df = df.copy()
+        
+        # Check whether all Smiles are processable:
+        df_len_1 = len(self.df)
+        self.df["ValidMol"] = self.df[smiles_col].apply(
+            lambda x: u.check_mol(u.smiles_to_mol(x))
+        )
+        self.df = self.df.dropna(subset=["ValidMol"]).copy()
+        df_len_2 = len(self.df)
+        if df_len_1 < df_len_2:
+            print(f"Removed {df_len_1 - df_len_2} entries with invalid SMILES.")
+                
         self.df = self.df.sort_values(self.act_col, ascending=self.reverse).reset_index(drop=True)
         self.sim_cutoff = sim_cutoff
         self.num_sim = num_sim

@@ -464,7 +464,7 @@ def smiles_to_mol(smiles: str) -> Mol:
 
     try:
         mol = Chem.MolFromSmiles(smiles)
-        if mol is not None:
+        if mol is not None and isinstance(mol, Mol):
             return mol
         return np.nan
     except:

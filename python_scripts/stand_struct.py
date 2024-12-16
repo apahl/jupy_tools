@@ -16,6 +16,7 @@ import csv
 from copy import deepcopy
 import argparse
 import signal
+import time
 
 # from contextlib import contextmanager
 import subprocess
@@ -34,7 +35,7 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.MolStandardize.rdMolStandardize import (
     CleanupInPlace,
     RemoveFragmentsInPlace,
-    IsotopeParentInPlace,
+    # IsotopeParentInPlace,
     TautomerParentInPlace,
     ChargeParentInPlace,
     
@@ -51,8 +52,15 @@ DEBUG = False
 
 def check_mol(mol: Mol) -> bool:
     """Check whether mol is indeed an instance of RDKit mol object,
-    and not np.nan or None."""
-    return isinstance(mol, Mol)    
+    and not np.nan or None.
+    Make also sure that the mol can be round-tripped to Smiles and back."""	
+    if not isinstance(mol, Mol):
+        return None
+    smi = mol_to_smiles(mol)
+    if smi is None:
+        return None
+    mol = smiles_to_mol(smi)
+    return mol
 
 
 # Code for legacy tautomer canonicalizer:
@@ -177,28 +185,29 @@ def csv_supplier(fo, dialect):
             row[col] = row[col].strip()
             row[col] = row[col].replace("\n", "; ")
             row[col] = row[col].replace("\r\n", "; ")
-        if len(row["Smiles"]) == 0:
-            yield {"Mol": None}
-            continue
-        mol = smiles_to_mol(row["Smiles"])
-        if mol is None:
-            yield {"Mol": None}
-            continue
         d = {}
+        if len(row["Smiles"]) == 0:
+            d["Mol"] = None
+        else:
+            mol = smiles_to_mol(row["Smiles"])
+            if mol is None:
+                d["Mol"] = None
+            else:
+                d["Mol"] = mol
         for prop in row:
             if prop == "Smiles":
                 continue
             d[prop] = get_value(row[prop])
-        d["Mol"] = mol
         yield d
 
 
 def sdf_supplier(fo):
     reader = Chem.ForwardSDMolSupplier(fo)
     for mol in reader:
-        if mol is None or mol.GetNumAtoms() == 0:
+        if mol is None:
             yield {"Mol": None}
             continue
+            
         d = {}
         # Is the SD file name property used?
         name = mol.GetProp("_Name")
@@ -206,11 +215,13 @@ def sdf_supplier(fo):
             d["Name"] = get_value(name)
         for prop in mol.GetPropNames():
             d[prop] = get_value(mol.GetProp(prop))
-
         for prop in mol.GetPropNames():
             d[prop] = get_value(mol.GetProp(prop))
             mol.ClearProp(prop)
-        d["Mol"] = mol
+        if mol.GetNumAtoms() == 0:
+            d["Mol"] = None
+        else:
+            d["Mol"] = mol
         yield d
 
 
@@ -295,7 +306,9 @@ def process(
     first_dot = fn[0].find(".")
     fn_base = fn[0][:first_dot]
     out_fn = f"{fn_base}_{out_type}{deglyco_str}{canon_str}{dupl_str}{min_ha_str}{max_ha_str}.tsv"
+    fail_fn = f"{fn_base}_{out_type}{deglyco_str}{canon_str}{dupl_str}{min_ha_str}{max_ha_str}_failed.tsv"
     outfile = open(out_fn, "w", encoding="utf-8")
+    failfile = open(fail_fn, "w", encoding="utf-8")
     if canon == "cxcalc":
         cx_calc_input_fn = f"{fn_base}_cxcalc_input.csv"
         cx_calc_result_fn = f"{fn_base}_cxcalc_result.tsv"
@@ -346,8 +359,10 @@ def process(
         for rec in reader:
             ctr["In"] += 1
             mol = rec["Mol"]
-            if not check_mol(mol):
+            mol = check_mol(mol)
+            if mol is None :
                 ctr["Fail_NoMol"] += 1
+                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                 continue
             if first_mol:
                 first_mol = False
@@ -383,28 +398,37 @@ def process(
             # Standardization
 
             CleanupInPlace(mol)
-            if not check_mol(mol):
+            mol = check_mol(mol)
+            if mol is None:
                 ctr["Fail_NoMol"] += 1
+                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                 continue
             RemoveFragmentsInPlace(mol)
-            if not check_mol(mol):
+            mol = check_mol(mol)
+            if mol is None:
                 ctr["Fail_NoMol"] += 1
+                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                 continue
             try:
                 # This can give an exception
                 ChargeParentInPlace(mol)
             except:
                 ctr["Fail_NoMol"] += 1
+                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                 continue
-            if not check_mol(mol):
+            mol = check_mol(mol)
+            if mol is None:
                 ctr["Fail_NoMol"] += 1
+                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                 continue
 
             # Racemize all stereocenters
             if "rac" in out_type:
                 StereoParentInPlace(mol)
-                if not check_mol(mol):
+                mol = check_mol(mol)
+                if mol is None:
                     ctr["Fail_NoMol"] += 1
+                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                     continue
 
             if deglyco:
@@ -417,16 +441,20 @@ def process(
                 except ValueError:
                     ctr["Fail_Deglyco"] += 1
                     mol = mol_copy
-                if not check_mol(mol):
+                mol = check_mol(mol)
+                if mol is None:
                     ctr["Fail_Deglyco"] += 1
+                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                     mol = mol_copy
                 if mol.GetNumAtoms() < num_atoms:
                     ctr["Deglyco"] += 1
 
             if "murcko" in out_type:
                 mol = MurckoScaffold.GetScaffoldForMol(mol)
-                if not check_mol(mol):
+                mol = check_mol(mol)
+                if mol is None:
                     ctr["Fail_NoMol"] += 1
+                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                     continue
 
             if canon == "none" or canon == "cxcalc":
@@ -437,6 +465,7 @@ def process(
                     inchi = Chem.inchi.MolToInchiKey(mol)
                 except:
                     ctr["Fail_NoMol"] += 1
+                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                     continue
                 if not keep_dupl:
                     if inchi in inchi_keys:
@@ -464,13 +493,16 @@ def process(
             if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
                 TautomerParentInPlace(mol)        
-                if not check_mol(mol):
+                mol = check_mol(mol)
+                if mol is None:
                     ctr["Fail_NoMol"] += 1
+                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                     continue
                 try:
                     inchi = Chem.inchi.MolToInchiKey(mol)
                 except:
                     ctr["Fail_NoMol"] += 1
+                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                     continue
                 if not keep_dupl:
                     # When canonicalization IS performed,
@@ -484,6 +516,7 @@ def process(
             smi = mol_to_smiles(mol)
             if smi is None:
                 ctr["Fail_NoMol"] += 1
+                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
                 continue
             d["Smiles"] = smi
             ctr["Out"] += 1
@@ -515,6 +548,7 @@ def process(
             file_obj.close()
     if canon == "cxcalc":
         cx_calc_inp.close()
+    failfile.close()
     outfile.close()
     if canon == "legacy":
         timeout_str = f"  Timeout: {ctr['Timeout']:6d}"
