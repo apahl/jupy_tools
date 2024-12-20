@@ -193,17 +193,17 @@ def fp_ecfc4_from_smiles(smi):
 
 def add_fps(df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4") -> pd.DataFrame:
     """Add a Fingerprint column to the DataFrame.
-    Available types: ECFC4 (default), ECFC6, ECFP4, ECFP6.
+    Available types: ECFC4 (default), ECFC6, ECFP4, ECFP6, FCFP4, FCFP6.
     """
+    assert RDKIT, "RDKit is not installed."
+    assert fp_type in FPDICT, f"Unknown fingerprint type: {fp_type}. Available fingerprints are: {", ".join(FPDICT.keys())}"
+
     def _calc_fp(smi):
         mol = smiles_to_mol(smi)
         if mol is np.nan:
             return np.nan
         fp = FPDICT[fp_type](mol)
         return fp
-    
-    assert fp_type in FPDICT, f"Unknown fingerprint type: {fp_type}."
-    assert RDKIT, "RDKit not installed."
     
     df = df.copy()
     
@@ -1403,6 +1403,24 @@ def inner_merge(
         info(df_result, "merge_inner: result")
         info(df_missing, "merge_inner: missing")
     return df_result, df_missing
+
+
+def id_filter(df, id_list, id_col, reset_index=True, sort_by_input=False):
+    """Filter a dataframe by a list of IDs.
+    If `sort_by_input` is True, the output is sorted by the input list."""
+    if isinstance(id_list, str) or isinstance(id_list, int):
+        id_list = [id_list]
+    result = df[df[id_col].isin(id_list)]
+
+    if reset_index:
+        result = result.reset_index(drop=True)
+    if sort_by_input:
+        result["_sort"] = pd.Categorical(
+            result[id_col], categories=id_list, ordered=True
+        )
+        result = result.sort_values("_sort")
+        result = result.drop("_sort", axis=1)
+    return result
 
 
 def drop_duplicates(

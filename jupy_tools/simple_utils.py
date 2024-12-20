@@ -418,6 +418,24 @@ def listify(s, sep=" ", as_int=True, strip=True, sort=False):
     return result
 
 
+def id_filter(df, id_list, id_col, reset_index=True, sort_by_input=False):
+    """Filter a dataframe by a list of IDs.
+    If `sort_by_input` is True, the output is sorted by the input list."""
+    if isinstance(id_list, str) or isinstance(id_list, int):
+        id_list = [id_list]
+    result = df[df[id_col].isin(id_list)]
+
+    if reset_index:
+        result = result.reset_index(drop=True)
+    if sort_by_input:
+        result["_sort"] = pd.Categorical(
+            result[id_col], categories=id_list, ordered=True
+        )
+        result = result.sort_values("_sort")
+        result = result.drop("_sort", axis=1)
+    return result
+
+
 def filter(
     df: pd.DataFrame, mask, reset_index=True
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
