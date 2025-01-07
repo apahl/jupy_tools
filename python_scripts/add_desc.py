@@ -7,10 +7,11 @@ Add Descriptors to files
 
 *Created on Sun Dec 15 2024 17:45 by A. Pahl*
 
-Add descriptors (and later maybe also fingerprints) zo a set of files containin Smiles and InChIKeys.
+Add descriptors (and later maybe also fingerprints) to a set of files 
+containing Smiles and InChIKeys.
 The entries in each file are deduplicated by InChIKey.
 If the InChIKey is not present in the file, it is calculated from the Smiles, 
-but no standardization is performed on the structues.
+but no standardization is performed on the structures.
 Use the `stand_struct` script for this purpose before."""
 
 import os
