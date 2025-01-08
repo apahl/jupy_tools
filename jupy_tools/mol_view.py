@@ -20,6 +20,7 @@ from PIL import Image, ImageChops
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.rdchem import Mol
+from rdkit.Chem import PandasTools
 from rdkit.Chem.rdCoordGen import AddCoords  # New coord. generation
 from rdkit.Chem import Draw
 from rdkit.Chem.Draw import rdMolDraw2D
@@ -875,3 +876,11 @@ def write_mol_table(
     utils.write(page, fn)
     if IPYTHON:
         return HTML('<a href="{}">{}</a>'.format(fn, title))
+
+
+def write_excel(df: pd.DataFrame, fn: str, smiles_col="Smiles", size=300):
+    """Write the dataframe to an Excel file, containing the structures as images.
+    This function uses the RDKit PandasTools module."""
+    df = df.copy()
+    df["Mol"] = df[smiles_col].apply(utils.smiles_to_mol)
+    PandasTools.SaveXlsxFromFrame(df, fn, size=(size, size), molCol='Mol')
