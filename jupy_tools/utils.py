@@ -215,16 +215,27 @@ def add_fps(df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4")
     return df
 
 
-def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles") -> pd.DataFrame:
+def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataFrame:
     """Add a ErG fingerprint columns to the DataFrame.
     Because the bits are inherently explainable, each of the 315 positions
     gets its own column. This function resets the index.
+    
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The input DataFrame
+    smiles_col: str
+        The column containing the SMILES strings. Default: "Smiles"
+    prefix: str
+        The prefix for the new columns. Can be None or an empty string. Default: "ErG"
     
     Returns:
     ========
     A DataFrame with the added 315 ErG fingerprint columns.
     """
     assert RDKIT, "RDKit is not installed."
+    if prefix is None:
+        prefix = ""
 
     # Generate the 315 explanations for the bits:
     # Note: this will only work when this bug is fixed in the RDKit:
@@ -236,7 +247,7 @@ def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles") -> pd.DataFrame:
     for idx1 in range(prop_len):
         for idx2 in range(idx1, prop_len):
             for dist in range(1, 16):
-                positions.append(f"{properties[idx1]}_{properties[idx2]}_{dist}")
+                positions.append(f"{prefix}_{properties[idx1]}_{properties[idx2]}_{dist}")
     assert len(positions) == fp_len, f"Expected 315 positions, got {len(positions)}"
 
     def _calc_fp(smi):
