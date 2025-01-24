@@ -179,6 +179,8 @@ def has_isotope(mol: Mol) -> bool:
 def csv_supplier(fo, dialect):
     reader = csv.DictReader(fo, dialect=dialect)
     columns = reader.fieldnames
+    # Collect string properties, do not run them through `get_value()`:
+    str_props = set()
     for row in reader:
         for col in columns:
             # Clean up the strings:
@@ -197,11 +199,21 @@ def csv_supplier(fo, dialect):
         for prop in row:
             if prop == "Smiles":
                 continue
-            d[prop] = get_value(row[prop])
+            val = row[prop]
+            if not prop in str_props:
+                val = get_value(val)
+                if isinstance(val, str) and len(val) > 0:  # missing value does not mean string prop
+                    str_props.add(prop)
+            d[prop] = val
         yield d
+    print()
+    print("Auto-detected string properties in the TSV:")
+    print(", ".join(list(str_props)))
 
 
 def sdf_supplier(fo):
+    # Collect string properties, do not run them through `get_value()`:
+    str_props = set()
     reader = Chem.ForwardSDMolSupplier(fo)
     for mol in reader:
         if mol is None:
@@ -214,15 +226,21 @@ def sdf_supplier(fo):
         if len(name) > 0:
             d["Name"] = get_value(name)
         for prop in mol.GetPropNames():
-            d[prop] = get_value(mol.GetProp(prop))
-        for prop in mol.GetPropNames():
-            d[prop] = get_value(mol.GetProp(prop))
+            val = mol.GetProp(prop)
+            if not prop in str_props:
+                val = get_value(val)
+                if isinstance(val, str) and len(val) > 0:  # missing value does not mean string prop
+                    str_props.add(prop)
+            d[prop] = val
             mol.ClearProp(prop)
         if mol.GetNumAtoms() == 0:
             d["Mol"] = None
         else:
             d["Mol"] = mol
         yield d
+    print()
+    print("Auto-detected string properties in the SDF:")
+    print(", ".join(list(str_props)))
 
 
 def process(
