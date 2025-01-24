@@ -70,6 +70,19 @@ DESC = {
     "nSPS": lambda x: round(SPS(x), 2),   # normalizing is the default
 }
 
+# TODO: Add for v2: 
+#   Misc: SA_Score
+#   rdMolDesc
+#      CalcNumSpiroAtoms (maybe, or is this too rare?),
+#      CalcNumAmideBonds, CalcNumHeteroatoms
+#      CalcNumAliphaticCarbocycles, CalcNumAliphaticHeterocycles,
+#      CalcNumAromaticCarbocycles, CalcNumAromaticHeterocycles,
+#      CalcNumHeterocycles,
+#      CalcNumSaturatedCarbocycles, CalcNumSaturatedHeterocycles, CalcNumSaturatedRings, 
+#      
+#   custom.NumBasic, custom.NumAcid (see Logseq Todos)
+#   "main" becomes equivalent to "v1" (change ArgParser)
+
 
 def check_mol(mol: Mol) -> bool:
     """Check whether mol is indeed an instance of RDKit mol object,

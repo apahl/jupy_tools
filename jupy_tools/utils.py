@@ -29,6 +29,7 @@ try:
     from rdkit.Chem import DataStructs
     from rdkit.Chem import rdqueries
     from rdkit.Chem import rdFingerprintGenerator
+    from rdkit.Chem import rdReducedGraphs as ERG
     import rdkit.Chem.Descriptors as Desc
     from rdkit.Chem.Scaffolds import MurckoScaffold
 
@@ -211,6 +212,59 @@ def add_fps(df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4")
         df[fp_col] = df[smiles_col].progress_apply(lambda x: _calc_fp(x))
     else:
         df[fp_col] = df[smiles_col].apply(lambda x: _calc_fp(x))
+    return df
+
+
+def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles") -> pd.DataFrame:
+    """Add a ErG fingerprint columns to the DataFrame.
+    Because the bits are inherently explainable, each of the 315 positions
+    gets its own column. This function resets the index.
+    
+    Returns:
+    ========
+    A DataFrame with the added 315 ErG fingerprint columns.
+    """
+    assert RDKIT, "RDKit is not installed."
+
+    # Generate the 315 explanations for the bits:
+    # Note: this will only work when this bug is fixed in the RDKit:
+    #       https://github.com/rdkit/rdkit/issues/8201
+    fp_len = 315
+    properties = ["D", "A", "+", "-", "Hf", "Ar"]
+    positions = []
+    prop_len = len(properties)
+    for idx1 in range(prop_len):
+        for idx2 in range(idx1, prop_len):
+            for dist in range(1, 16):
+                positions.append(f"{properties[idx1]}_{properties[idx2]}_{dist}")
+    assert len(positions) == fp_len, f"Expected 315 positions, got {len(positions)}"
+
+    def _calc_fp(smi):
+        mol = smiles_to_mol(smi)
+        if mol is np.nan:
+            return np.full(fp_len, np.nan)
+        fp = ERG.GetErGFingerprint(mol)
+        return fp
+
+    
+    df = df.copy()
+    df = df.reset_index(drop=True)
+    
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df["_ErG_FP"] = df[smiles_col].progress_apply(lambda x: _calc_fp(x))
+    else:
+        df["_ErG_FP"] = df[smiles_col].apply(lambda x: _calc_fp(x))
+       
+    # Split the 315 bits into separate columns: 
+    df_fp_cols = pd.DataFrame(df["_ErG_FP"].tolist(), columns=positions)
+    assert len(df) == len(df_fp_cols), f"Length mismatch: {len(df)} != {len(df_fp_cols)}"
+    
+    # Remove the original column:
+    df = df.drop(columns=["_ErG_FP"])
+    
+    # Merge with original DataFrame:
+    df = pd.concat([df, df_fp_cols], axis=1)
+    
     return df
 
 
