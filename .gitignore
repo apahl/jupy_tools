@@ -7,9 +7,10 @@ build/
 eggs/
 .eggs/
 *.egg-info/
+python_scripts/stand_struct_temp.py
 .installed.cfg
 *.egg
+_doc.md
 
-python_scripts/stand_struct_temp.py
 snippets.txt
 tags
