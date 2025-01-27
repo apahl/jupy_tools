@@ -518,8 +518,14 @@ def process(
 
             if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
-                TautomerParentInPlace(mol)        
-                mol = check_mol(mol)
+                # `TautomerParentInPlace` can give an exception, so we have to catch it.
+                mol_copy = deepcopy(mol)
+                try: 
+                    TautomerParentInPlace(mol)
+                    mol = check_mol(mol)
+                except:
+                    # This is debatable, but for now, when canonicalization fails, fail the molecule
+                    mol = None
                 if mol is None:
                     ctr["Fail_NoMol"] += 1
                     failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
