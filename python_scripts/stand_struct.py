@@ -226,11 +226,19 @@ def sdf_supplier(fo):
         if len(name) > 0:
             d["Name"] = get_value(name)
         for prop in mol.GetPropNames():
+            # Clean up the strings:
             val = mol.GetProp(prop)
+            # Clean up the strings (1):
+            val = val.strip()
             if not prop in str_props:
                 val = get_value(val)
                 if isinstance(val, str) and len(val) > 0:  # missing value does not mean string prop
                     str_props.add(prop)
+            # Clean up the strings (2):
+            if prop in str_props:
+                val = val.replace("\n", "; ")
+                val = val.replace("\r\n", "; ")
+                val = val.replace("\t", "; ")
             d[prop] = val
             mol.ClearProp(prop)
         if mol.GetNumAtoms() == 0:
