@@ -303,7 +303,7 @@ def process(
         if min_heavy_atoms != 3:
             min_ha_str = f"_minha_{min_heavy_atoms}"
         if max_heavy_atoms != 50:
-            max_ha_str = f"_maxha_{min_heavy_atoms}"
+            max_ha_str = f"_maxha_{max_heavy_atoms}"
 
     if len(columns) > 0:
         columns = set(columns.split(","))
