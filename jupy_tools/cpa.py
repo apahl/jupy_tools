@@ -5,8 +5,11 @@ Helper functions for analysis of the Cell Painting Assay data.
 """
 
 # import functools
+import base64
+import gc
 from glob import glob
 import os.path as op
+from io import BytesIO as IO
 from typing import Iterable, List, Optional, Union
 
 # import sys
@@ -907,6 +910,44 @@ def calc_median_profile(
     return df_mp
 
 
+def b64_img(im, format="JPEG"):
+    if isinstance(im, IO):
+        needs_close = False
+        img_file = im
+    else:
+        needs_close = True
+        img_file = IO()
+        im.save(img_file, format=format)
+    b64 = base64.b64encode(img_file.getvalue())
+    b64 = b64.decode()
+    if needs_close:
+        img_file.close()
+    return b64
+
+
+def img_tag(im, format="jpeg", options=None):
+    tag = """<img {} src="data:image/{};base64,{}" alt="Image"/>"""
+    if options is None:
+        options = ""
+    b = b64_img(im, format=format)
+    img_tag = tag.format(options, format.lower(), b)
+    return img_tag
+
+
+def mpl_img_tag(options='style="width: 1100px;"', format="jpg") -> str:
+    img_file = IO()
+    plt.savefig(img_file, bbox_inches="tight", format=format)
+    result = img_tag(
+        img_file, format=format, options=options
+    )  # 900px; changed from 1000px (14-Jan-2019)
+    img_file.close()
+    # important, otherwise the plots will accumulate and fill up memory:
+    plt.clf()
+    plt.close()
+    gc.collect()
+    return result
+
+
 def heat_mpl(
     df,
     id_prop="Compound_Id",
@@ -957,7 +998,8 @@ def heat_mpl(
     color_range = kwargs.get("color_range", 15)
     img_size = kwargs.get("img_size", None)
     features = kwargs.get("features", None)
-    save_to_file = kwargs.get("save_to_file", "heatmap.png")
+    save_to_file = kwargs.get("save_to_file", None)
+    img_tag_options = kwargs.get("img_tag_options", 'style="width: 1100px;"')
 
     if features is None:
         features = ACT_PROF_FEATURES
@@ -990,9 +1032,9 @@ def heat_mpl(
                 img_size += 1.0
         else:
             img_size = 19.0
-    plt.style.use("seaborn-white")
-    plt.style.use("seaborn-pastel")
-    plt.style.use("seaborn-talk")
+    plt.style.use("seaborn-v0_8-white")
+    plt.style.use("seaborn-v0_8-pastel")
+    plt.style.use("seaborn-v0_8-talk")
     plt.rcParams["axes.labelsize"] = 25
     if "rcparams" in kwargs:
         plt.rcParams.update(kwargs["rcparams"])
@@ -1067,7 +1109,12 @@ def heat_mpl(
     if show:
         plt.show()
     else:
-        if not isinstance(save_to_file, list):
-            save_to_file = [save_to_file]
-        for fn in save_to_file:
-            plt.savefig(fn, bbox_inches="tight")
+        if save_to_file is None:
+            result = mpl_img_tag(options=img_tag_options, format="jpg")
+            return result
+        else:
+            if isinstance(save_to_file, str):
+                save_to_file = [save_to_file]
+            if isinstance(save_to_file, list):
+                for fn in save_to_file:
+                    plt.savefig(fn, bbox_inches="tight")

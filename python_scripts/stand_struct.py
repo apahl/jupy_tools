@@ -50,7 +50,7 @@ LOG.setLevel(RDLogger.CRITICAL)
 DEBUG = False
 
 
-def check_mol(mol: Mol) -> bool:
+def check_mol(mol: Mol) -> Mol | None:
     """Check whether mol is indeed an instance of RDKit mol object,
     and not np.nan or None.
     Make also sure that the mol can be round-tripped to Smiles and back."""	
@@ -519,7 +519,7 @@ def process(
             if canon == "rdkit":
                 # Late canonicalization, because it is so expensive:
                 # `TautomerParentInPlace` can give an exception, so we have to catch it.
-                mol_copy = deepcopy(mol)
+                # mol_copy = deepcopy(mol)
                 try: 
                     TautomerParentInPlace(mol)
                     mol = check_mol(mol)

@@ -5,7 +5,9 @@ Utilities for data calculation.
 """
 
 import gzip
+import os
 import os.path as op
+import platform
 from glob import glob
 import subprocess
 import tempfile
@@ -24,13 +26,16 @@ import numpy as np
 from multiprocessing import Pool
 
 try:
-    from rdkit.Chem import AllChem as Chem
+    from rdkit.Chem import AllChem as Chem, QED
     from rdkit.Chem import Mol
     from rdkit.Chem import DataStructs
     from rdkit.Chem import rdqueries
     from rdkit.Chem import rdFingerprintGenerator
     from rdkit.Chem import rdReducedGraphs as ERG
     import rdkit.Chem.Descriptors as Desc
+    from rdkit.Chem.SpacialScore import SPS
+    from rdkit.Chem import rdMolDescriptors as rdMolDesc
+    from rdkit.Chem import Fragments
     from rdkit.Chem.Scaffolds import MurckoScaffold
 
     from rdkit.Chem.MolStandardize.rdMolStandardize import (
@@ -65,6 +70,7 @@ try:
     FPDICT["FCFP6"] = lambda m: FFP6.GetFingerprint(m)    
     
     
+    from Contrib.NP_Score import npscorer
     from rdkit import rdBase
 
     rdBase.DisableLog("rdApp.info")
@@ -135,16 +141,30 @@ class MeasureRuntime:
 
 def timestamp(show=True):
     """Print (show=True) or return (show=False) a timestamp string."""
+    info_string = f'{time.strftime("%d-%b-%Y %H:%M:%S")} ({os.getlogin()} on {platform.system()})'
     if show:
-        print("Timestamp:", time.strftime("%d-%b-%Y %H:%M:%S"))
+        print("Timestamp:", info_string)
     else:
-        return time.strftime("%d-%b-%Y %H:%M:%S")
+        return info_string
+    
 
 
-def check_mol(mol: Mol) -> bool:
+# def check_mol(mol: Mol) -> bool:
+#     """Check whether mol is indeed an instance of RDKit mol object,
+#     and not np.nan or None."""
+#     return isinstance(mol, Mol)    
+def check_mol(mol: Mol) -> Mol:
     """Check whether mol is indeed an instance of RDKit mol object,
-    and not np.nan or None."""
-    return isinstance(mol, Mol)    
+    and not np.nan or None.
+    Make also sure that the mol can be round-tripped to Smiles and back.
+    Returns the mol or np.nan."""	
+    if not isinstance(mol, Mol):
+        return np.nan
+    smi = mol_to_smiles(mol)
+    if smi is np.nan:
+        return np.nan
+    mol = smiles_to_mol(smi)
+    return mol
 
 
 def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
@@ -584,26 +604,36 @@ def standardize_mol(
     ========
     Smiles of the standardized molecule. NAN for failed molecules."""
 
-    if not check_mol(mol):
+    mol = check_mol(mol)
+    if mol is np.nan:
         return np.nan
     CleanupInPlace(mol)
-    if not check_mol(mol):
+    mol = check_mol(mol)
+    if mol is np.nan:
         return np.nan
     if largest_fragment:
         RemoveFragmentsInPlace(mol)
-        if not check_mol(mol):
+        mol = check_mol(mol)
+        if mol is np.nan:
             return np.nan
     if uncharge:
         ChargeParentInPlace(mol)
-        if not check_mol(mol):
+        mol = check_mol(mol)
+        if mol is np.nan:
             return np.nan
     if remove_stereo:
         StereoParentInPlace(mol)
-        if not check_mol(mol):
+        mol = check_mol(mol)
+        if mol is np.nan:
             return np.nan
     if canonicalize_tautomer:
-        TautomerParentInPlace(mol)        
-        if not check_mol(mol):
+        try: 
+            TautomerParentInPlace(mol)
+            mol = check_mol(mol)
+        except:
+            # This is debatable, but for now, when canonicalization fails, fail the molecule
+            mol = np.nan
+        if mol is np.nan:
             return np.nan
     return mol_to_smiles(mol)
 
@@ -614,7 +644,7 @@ def standardize_smiles(
     uncharge=True,
     standardize=True,
     remove_stereo=False,
-    canonicalize_tautomer=False,
+    canonicalize_tautomer=True,
 ) -> str:
     """Creates a molecule from the Smiles string and passes it to `standardize_mol().
 
@@ -631,6 +661,74 @@ def standardize_smiles(
         canonicalize_tautomer=canonicalize_tautomer,
     )
     return result
+
+
+def standardize_df(
+        df, 
+        smiles_col="Smiles", **kwargs) -> DataFrame:
+    """Standardize the structures in the DataFrame.
+    The Smiles column is replaced by the standardized Smiles.
+
+    Parameters:
+    ===========
+    df: the input DataFrame
+    smiles_col: the name of the column containing the Smiles
+
+    Returns:
+    ========
+    A DataFrame with the standardized Smiles.
+    """
+    df = df.copy()
+    if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
+        df[smiles_col] = df[smiles_col].progress_apply(
+            lambda x: standardize_smiles(x, **kwargs)
+        )
+    else:
+        df[smiles_col] = df[smiles_col].apply(lambda x: standardize_smiles(x, **kwargs))
+    return df
+
+
+def add_desc(df, smiles_col="Smiles", filter_nans=True) -> DataFrame:
+    """Add a set of standard RDKit descriptors to the DataFrame.
+    The descriptors are added as new columns.
+    if filter_nans is True, rows with NANs are removed.
+    Returns: the DataFrame with the added columns."""
+
+    fscore = npscorer.readNPModel() 
+    def _score_np(mol):
+        return npscorer.scoreMol(mol, fscore)
+    
+    descriptors = {
+        "NP_Like": lambda x: round(score_np(x), 2), 
+        "QED": lambda x: round(QED.default(x), 3),
+        "NumHA": lambda x: x.GetNumAtoms(),
+        "MW": lambda x: round(Desc.MolWt(x), 2),
+        "NumRings": rdMolDesc.CalcNumRings,
+        "NumRingsArom": rdMolDesc.CalcNumAromaticRings,
+        "NumRingsAli": rdMolDesc.CalcNumAliphaticRings,
+        "NumHDon": rdMolDesc.CalcNumLipinskiHBD,
+        "NumHAcc": rdMolDesc.CalcNumLipinskiHBA,
+        "LogP": lambda x: round(Desc.MolLogP(x), 2),
+        "TPSA": lambda x: round(rdMolDesc.CalcTPSA(x), 2),
+        "NumRotBd": rdMolDesc.CalcNumRotatableBonds,
+        "NumAtOx": lambda x: len(
+            [a for a in x.GetAtoms() if a.GetAtomicNum() == 8]
+        ),
+        "NumAtN": lambda x: len(
+            [a for a in x.GetAtoms() if a.GetAtomicNum() == 7]
+        ),
+        "NumAtHal": Fragments.fr_halogen,
+        "NumAtBridgehead": rdMolDesc.CalcNumBridgeheadAtoms,
+        "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3), 
+        "nSPS": lambda x: round(SPS(x), 2),   # normalizing is the default
+    }
+    desc_keys = list(descriptors.keys())
+    df = df.copy()
+    for key in desc_keys:
+        df = calc_from_smiles(
+            df, key, descriptors[key], smiles_col, filter_nans=filter_nans
+        )
+    return df
 
 
 def parallel_pandas(df: pd.DataFrame, func: Callable, workers=6) -> pd.DataFrame:
@@ -1189,7 +1287,7 @@ def sim_search(
     return df
 
 
-def read_tsv(input_tsv: str, sep="\t") -> pd.DataFrame:
+def read_tsv(input_tsv: str, sep="\t", encoding="utf-8") -> pd.DataFrame:
     """Read a tsv file
 
     Parameters:
@@ -1201,7 +1299,7 @@ def read_tsv(input_tsv: str, sep="\t") -> pd.DataFrame:
     The parsed tsv as Pandas DataFrame.
     """
     input_tsv = input_tsv.replace("file://", "")
-    df = pd.read_csv(input_tsv, sep=sep, low_memory=False)
+    df = pd.read_csv(input_tsv, sep=sep, encoding=encoding, low_memory=False)
     if INTERACTIVE:
         info(df, "read_tsv")
     return df
