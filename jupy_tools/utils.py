@@ -699,7 +699,7 @@ def add_desc(df, smiles_col="Smiles", filter_nans=True) -> DataFrame:
         return npscorer.scoreMol(mol, fscore)
     
     descriptors = {
-        "NP_Like": lambda x: round(score_np(x), 2), 
+        "NP_Like": lambda x: round(_score_np(x), 2), 
         "QED": lambda x: round(QED.default(x), 3),
         "NumHA": lambda x: x.GetNumAtoms(),
         "MW": lambda x: round(Desc.MolWt(x), 2),

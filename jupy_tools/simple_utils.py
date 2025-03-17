@@ -7,6 +7,7 @@ This is the simplified version without the RDKit functions.
 
 import os
 import os.path as op
+import platform
 from glob import glob
 import subprocess
 import tempfile
@@ -85,10 +86,11 @@ class MeasureRuntime:
 
 def timestamp(show=True):
     """Print (show=True) or return (show=False) a timestamp string."""
+    info_string = f'{time.strftime("%d-%b-%Y %H:%M:%S")} ({os.getlogin()} on {platform.system()})'
     if show:
-        print("Timestamp:", time.strftime("%d-%b-%Y %H:%M:%S"))
+        print("Timestamp:", info_string)
     else:
-        return time.strftime("%d-%b-%Y %H:%M:%S")
+        return info_string
 
 
 def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
