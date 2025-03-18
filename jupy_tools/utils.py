@@ -1329,7 +1329,7 @@ def read_chunked_tsv(pattern: str, sep="\t") -> pd.DataFrame:
     return result
 
 
-def write(text, fn):
+def write(fn, text):
     """Write text to a file."""
     with open(fn, "w") as f:
         f.write(text)
