@@ -93,6 +93,93 @@ def timestamp(show=True):
         return info_string
 
 
+def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
+    """log-printing for different kind of objects"""
+    if label is not None:
+        label_str = label
+    if isinstance(obj, str):
+        if label is None:
+            label_str = "String"
+        print(f"{label_str:{lpad}s}: {obj:>{rpad}s}")
+        return
+
+    try:
+        shape = obj.shape
+        if label is None:
+            label_str = "Shape"
+        else:
+            label_str = f"Shape {label}"
+        key_str = ""
+        has_nan_str = ""
+        try:
+            keys = list(obj.columns)
+            if len(keys) <= 5:
+                key_str = " [ " + ", ".join(keys) + " ] "
+            num_nan_cols = ((~obj.notnull()).sum() > 0).sum()
+            if num_nan_cols > 0:  # DF has nans
+                has_nan_str = f"( NAN values in {num_nan_cols} col(s) )"
+        except AttributeError:
+            pass
+        print(
+            f"{label_str:{lpad}s}: {shape[0]:{rpad}d} / {shape[1]:{4}d} {key_str} {has_nan_str}"
+        )
+        return
+    except (TypeError, AttributeError, IndexError):
+        pass
+
+    try:
+        shape = obj.data.shape
+        if label is None:
+            label_str = "Shape"
+        else:
+            label_str = f"Shape {label}"
+        key_str = ""
+        try:
+            keys = list(obj.data.columns)
+            if len(keys) <= 5:
+                key_str = " [ " + ", ".join(keys) + " ] "
+        except AttributeError:
+            pass
+        num_nan_cols = ((~obj.data.notnull()).sum() > 0).sum()
+        has_nan_str = ""
+        if num_nan_cols > 0:  # DF has nans
+            has_nan_str = f"( NAN values in {num_nan_cols} col(s) )"
+        print(
+            f"{label_str:{lpad}s}:   {shape[0]:{rpad}d} / {shape[1]:{4}d} {key_str} {has_nan_str}"
+        )
+        return
+    except (TypeError, AttributeError, IndexError):
+        pass
+
+    try:
+        fval = float(obj)
+        if label is None:
+            label_str = "Number"
+        if fval == obj:
+            print(f"{label_str:{lpad}s}:   {int(obj):{rpad}d}")
+        else:
+            print(f"{label_str:{lpad}s}:   {obj:{rpad+6}.5f}")
+        return
+    except (ValueError, TypeError):
+        # print("Exception")
+        pass
+
+    try:
+        length = len(obj)
+        if label is None:
+            label_str = "Length"
+        else:
+            label_str = f"Length {label}"
+        print(f"{label_str:{lpad}s}:   {length:{rpad}d}")
+        return
+    except (TypeError, AttributeError):
+        pass
+
+    if label is None:
+        label_str = "Object"
+    print(f"{label_str:{lpad}s}:   {obj}")
+
+
 def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
     """Print information about the result from a function,
     when INTERACTIVE is True.

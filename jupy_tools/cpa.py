@@ -984,6 +984,8 @@ def heat_mpl(
         The size of the image (default: None)
     features: List[str]
         The features to use for the heatmap.
+    compartments: bool
+        Whether to show the compartments in the heatmap (default: True)
     save_to_file: Union[str, List[str]]
         Save the plot as file, requires `show`=False (default: "heatmap.png")
         A single file name or a list of file names can be given
@@ -998,27 +1000,29 @@ def heat_mpl(
     color_range = kwargs.get("color_range", 15)
     img_size = kwargs.get("img_size", None)
     features = kwargs.get("features", None)
+    compartments = kwargs.get("compartments", True)
     save_to_file = kwargs.get("save_to_file", None)
     img_tag_options = kwargs.get("img_tag_options", 'style="width: 1100px;"')
 
     if features is None:
         features = ACT_PROF_FEATURES
 
-    # Re-calculate XTICKS for non-default parameter sets
-    if len(features) == len(ACT_PROF_FEATURES):
-        xticks = XTICKS  # global var
-    else:
-        print("  - Re-calculating xticks...")
-        # get positions of the compartments in the list of features
-        x = 1
-        xticks = [x]
-        for comp in ["Median_Cytoplasm", "Median_Nuclei"]:
-            for idx, p in enumerate(features[x:], 1):
-                if p.startswith(comp):
-                    xticks.append(idx + x)
-                    x += idx
-                    break
-        xticks.append(len(features))
+    if compartments:
+        # Re-calculate XTICKS for non-default parameter sets
+        if len(features) == len(ACT_PROF_FEATURES):
+            xticks = XTICKS  # global var
+        else:
+            print("  - Re-calculating xticks...")
+            # get positions of the compartments in the list of features
+            x = 1
+            xticks = [x]
+            for comp in ["Median_Cytoplasm", "Median_Nuclei"]:
+                for idx, p in enumerate(features[x:], 1):
+                    if p.startswith(comp):
+                        xticks.append(idx + x)
+                        x += idx
+                        break
+            xticks.append(len(features))
 
     df_len = len(df)
     if img_size is None:  # set defaults when no img_size is given
@@ -1083,26 +1087,27 @@ def heat_mpl(
     y_labels = y_labels[::-1]
     fp_list = fp_list[::-1]
     Z = np.asarray(fp_list)
-    plt.xticks(xticks)
     plt.yticks(np.arange(df_len) + 0.5, y_labels)
     plt.pcolor(Z, vmin=min_val, vmax=max_val, cmap=cmap)
-    plt.text(
-        xticks[1] // 2, -1.1, "Cells", horizontalalignment="center", fontsize=fs_text
-    )
-    plt.text(
-        xticks[1] + ((xticks[2] - xticks[1]) // 2),
-        -1.1,
-        "Cytoplasm",
-        horizontalalignment="center",
-        fontsize=fs_text,
-    )
-    plt.text(
-        xticks[2] + ((xticks[3] - xticks[2]) // 2),
-        -1.1,
-        "Nuclei",
-        horizontalalignment="center",
-        fontsize=fs_text,
-    )
+    if compartments:
+        plt.xticks(xticks)
+        plt.text(
+            xticks[1] // 2, -1.1, "Cells", horizontalalignment="center", fontsize=fs_text
+        )
+        plt.text(
+            xticks[1] + ((xticks[2] - xticks[1]) // 2),
+            -1.1,
+            "Cytoplasm",
+            horizontalalignment="center",
+            fontsize=fs_text,
+        )
+        plt.text(
+            xticks[2] + ((xticks[3] - xticks[2]) // 2),
+            -1.1,
+            "Nuclei",
+            horizontalalignment="center",
+            fontsize=fs_text,
+        )
     if kwargs.get("colorbar", True) and len(df) > 3:
         plt.colorbar()
     plt.tight_layout()
