@@ -674,6 +674,17 @@ def standardize_df(
     df: the input DataFrame
     smiles_col: the name of the column containing the Smiles
 
+    Keyword arguments:
+    ==================
+    largest_fragment: bool
+        Whether to keep only the largest fragment. Default: True
+    uncharge: bool
+        Whether to remove charges. Default: True
+    standardize: bool
+        Whether to standardize the molecule. Default: True
+    remove_stereo: bool
+        Whether to remove stereochemistry. Default: False
+    
     Returns:
     ========
     A DataFrame with the standardized Smiles.
