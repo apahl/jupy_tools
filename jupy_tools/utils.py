@@ -7,6 +7,8 @@ Utilities for data calculation.
 import gzip
 import os
 import os.path as op
+from pathlib import Path
+import datetime
 import platform
 from glob import glob
 import subprocess
@@ -1303,16 +1305,19 @@ def read_tsv(input_tsv: str, sep="\t", encoding="utf-8") -> pd.DataFrame:
 
     Parameters:
     ===========
-    input_tsv: Input tsv file
+    input_tsv: Input tsv file. Can also be pathlib.Path object.
 
     Returns:
     ========
     The parsed tsv as Pandas DataFrame.
     """
-    input_tsv = input_tsv.replace("file://", "")
-    df = pd.read_csv(input_tsv, sep=sep, encoding=encoding, low_memory=False)
+    if isinstance(input_tsv, str):
+        input_tsv = input_tsv.replace("file://", "")
+    p_input_tsv = Path(input_tsv)
+    df = pd.read_csv(p_input_tsv, sep=sep, encoding=encoding, low_memory=False)
     if INTERACTIVE:
-        info(df, "read_tsv")
+        time_stamp = datetime.datetime.fromtimestamp(p_input_tsv.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+        info(df, f"read_tsv (mod.: {time_stamp})")
     return df
 
 
