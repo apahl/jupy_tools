@@ -325,11 +325,6 @@ class MolImage:
             f.write(self.txt)
 
 
-def write(text, fn):
-    with open(fn, "w") as f:
-        f.write(text)
-
-
 # def _mol_img_tag(mol):
 #     return pd.Series(mol_img_tag(mol))
 
@@ -752,7 +747,7 @@ def write_mol_grid(
     summary = kwargs.pop("summary", None)
 
     page = templ.page(tbl, title=title, header=header, summary=summary)
-    utils.write(page, fn)
+    utils.write(fn, page)
     if IPYTHON:
         return HTML('<a href="{}">{}</a>'.format(fn, title))
 
@@ -873,7 +868,7 @@ def write_mol_table(
     html = "\n".join(lines)
     html = html + templ.TABLE_SORTER
     page = templ.page(html, title=title, header=header, summary=summary)
-    utils.write(page, fn)
+    utils.write(fn, page)
     if IPYTHON:
         return HTML('<a href="{}">{}</a>'.format(fn, title))
 
