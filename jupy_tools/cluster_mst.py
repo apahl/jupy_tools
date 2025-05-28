@@ -68,7 +68,8 @@ class ClusterMST:
         df_len_2 = len(self.df)
         if df_len_1 < df_len_2:
             print(f"Removed {df_len_1 - df_len_2} entries with invalid SMILES.")
-                
+        
+        self.df = self.df.drop(columns=["ValidMol"])
         self.df = self.df.sort_values(self.act_col, ascending=self.reverse).reset_index(drop=True)
         self.sim_cutoff = sim_cutoff
         self.num_sim = num_sim
