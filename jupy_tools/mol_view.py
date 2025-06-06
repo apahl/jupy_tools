@@ -168,6 +168,7 @@ class MolImage:
         self,
         mol: Union[Mol, str],
         svg: Optional[bool] = None,
+        opaque: bool = False,
         hlsss: Optional[str] = None,
         options: Optional[str] = None,
         **kwargs,
@@ -277,10 +278,11 @@ class MolImage:
         img = d2d.GetDrawingText()
         if self.svg:
             # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
-            img_list = [
-                line for line in img.splitlines()[1:] if not line.startswith("<rect")
-            ]
-            img = "\n".join(img_list)
+            if not opaque:
+                img_list = [
+                    line for line in img.splitlines()[1:] if not line.startswith("<rect")
+                ]
+                img = "\n".join(img_list)
             if THEME == "dark":
                 img = img.replace("#000000", "#FFFFFF")
 

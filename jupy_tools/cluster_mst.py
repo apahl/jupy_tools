@@ -141,7 +141,7 @@ class ClusterMST:
         self.df = pd.merge(self.df, mst_points, on=self.id_col, how="inner")
         edges = []
         for (cpd1, cpd2) in self.mst.edges():
-            edge = (self.pos[cpd1][0], self.pos[cpd1][1], self.pos[cpd2][0], self.pos[cpd2][1])
+            edge = (cpd1, cpd2, self.pos[cpd1][0], self.pos[cpd1][1], self.pos[cpd2][0], self.pos[cpd2][1])
             edges.append(edge)
-        self.edges = pd.DataFrame(edges, columns=["X1", "Y1", "X2", "Y2"])
+        self.edges = pd.DataFrame(edges, columns=[f"{self.id_col}_1", f"{self.id_col}_2", "X1", "Y1", "X2", "Y2"])
         print(f"MST generated with {len(entries)} entries.")
