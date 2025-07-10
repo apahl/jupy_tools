@@ -192,6 +192,8 @@ def csv_supplier(fo, dialect):
                 # Remove newlines:
                 row[col] = row[col].replace("\n", "")
                 row[col] = row[col].replace("\r\n", "")
+                # Also remove spaces:
+                row[col] = row[col].replace(" ", "")
             # Clean up the remaining strings:
             row[col] = row[col].strip()
             row[col] = row[col].replace("\n", "; ")
