@@ -1300,7 +1300,7 @@ def sim_search(
     return df
 
 
-def read_tsv(input_tsv: str, sep="\t", encoding="utf-8") -> pd.DataFrame:
+def read_tsv(input_tsv: str, sep="\t", encoding="utf-8", index_col=None) -> pd.DataFrame:
     """Read a tsv file
 
     Parameters:
@@ -1314,7 +1314,7 @@ def read_tsv(input_tsv: str, sep="\t", encoding="utf-8") -> pd.DataFrame:
     if isinstance(input_tsv, str):
         input_tsv = input_tsv.replace("file://", "")
     p_input_tsv = Path(input_tsv)
-    df = pd.read_csv(p_input_tsv, sep=sep, encoding=encoding, low_memory=False)
+    df = pd.read_csv(p_input_tsv, sep=sep, encoding=encoding, low_memory=False, index_col=index_col)
     if INTERACTIVE:
         time_stamp = datetime.datetime.fromtimestamp(p_input_tsv.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
         info(df, f"read_tsv (mod.: {time_stamp})")

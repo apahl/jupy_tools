@@ -87,7 +87,7 @@ class Cluster:
 
     def write(self, **kwargs):
         bn = kwargs.get("name", self.config["NAME"])
-        self.df.to_csv(f"{bn}.tsv", sep="\t", index=False)
+        self.molf.to_csv(f"{bn}.tsv", sep="\t", index=False)
         self.cl_info.to_csv(f"{bn}_info.tsv", sep="\t", index=False)
         with open(f"{bn}_config.json", "w") as f:
             json.dump(self.config, f)
