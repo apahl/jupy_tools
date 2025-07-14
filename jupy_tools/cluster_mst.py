@@ -11,7 +11,7 @@ from rdkit.Chem import rdFingerprintGenerator
 
 import networkx as nx
 
-from jupy_tools import utils as u, mol_view as mv
+from jupy_tools import utils as u
 
 NBITS = 2048
 FPDICT = {}
@@ -86,7 +86,7 @@ class ClusterMST:
         fp_call = FPDICT[self.fp_method]
         self.fps = {cpd_id: fp_call(Chem.MolFromSmiles(smi)) for cpd_id, smi in self.df[[self.id_col, self.smiles_col]].values}
         if len(self.ids) != len(self.fps):
-            raise ValueError("The number of IDs and fingerprints does not match.")
+            raise ValueError("The number of IDs and fingerprints does not match. Please note that the IDs must be unique in the input file.")
     
     def calc_mst(self):
         """Calculate the Minimum Spanning Tree."""
