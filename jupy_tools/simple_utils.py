@@ -291,7 +291,11 @@ def replace_nans(
     for col in columns:
         mask = result[col].isna()
         num_nans = mask.sum()
-        result.loc[mask, col] = value
+        if isinstance(value, str):
+            result[col] = result[col].astype(str)
+            result.loc[mask, col] = value
+        else:
+            result = result.fillna({col: value})
         if INTERACTIVE:
             info(
                 result,
