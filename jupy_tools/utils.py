@@ -46,32 +46,32 @@ try:
         IsotopeParentInPlace,
         TautomerParentInPlace,
         ChargeParentInPlace,
-        
-        StereoParentInPlace
+        StereoParentInPlace,
     )
-    
+
     NBITS = 2048
     FPDICT = {}
 
     EFP4 = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=NBITS)
     EFP6 = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=NBITS)
     FFP4 = rdFingerprintGenerator.GetMorganGenerator(
-        radius=2, fpSize=NBITS,
-        atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+        radius=2,
+        fpSize=NBITS,
+        atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen(),
     )
     FFP6 = rdFingerprintGenerator.GetMorganGenerator(
-        radius=3, fpSize=NBITS,
-        atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+        radius=3,
+        fpSize=NBITS,
+        atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen(),
     )
 
     FPDICT["ECFC4"] = lambda m: EFP4.GetCountFingerprint(m)
     FPDICT["ECFC6"] = lambda m: EFP6.GetCountFingerprint(m)
     FPDICT["ECFP4"] = lambda m: EFP4.GetFingerprint(m)
-    FPDICT["ECFP6"] = lambda m: EFP6.GetFingerprint(m)    
+    FPDICT["ECFP6"] = lambda m: EFP6.GetFingerprint(m)
     FPDICT["FCFP4"] = lambda m: FFP4.GetFingerprint(m)
-    FPDICT["FCFP6"] = lambda m: FFP6.GetFingerprint(m)    
-    
-    
+    FPDICT["FCFP6"] = lambda m: FFP6.GetFingerprint(m)
+
     from Contrib.NP_Score import npscorer
     from rdkit import rdBase
 
@@ -143,23 +143,24 @@ class MeasureRuntime:
 
 def timestamp(show=True):
     """Print (show=True) or return (show=False) a timestamp string."""
-    info_string = f'{time.strftime("%d-%b-%Y %H:%M:%S")} ({os.getlogin()} on {platform.system()})'
+    info_string = (
+        f'{time.strftime("%d-%b-%Y %H:%M:%S")} ({os.getlogin()} on {platform.system()})'
+    )
     if show:
         print("Timestamp:", info_string)
     else:
         return info_string
-    
 
 
 # def check_mol(mol: Mol) -> bool:
 #     """Check whether mol is indeed an instance of RDKit mol object,
 #     and not np.nan or None."""
-#     return isinstance(mol, Mol)    
+#     return isinstance(mol, Mol)
 def check_mol(mol: Mol) -> Mol:
     """Check whether mol is indeed an instance of RDKit mol object,
     and not np.nan or None.
     Make also sure that the mol can be round-tripped to Smiles and back.
-    Returns the mol or np.nan."""	
+    Returns the mol or np.nan."""
     if not isinstance(mol, Mol):
         return np.nan
     smi = mol_to_smiles(mol)
@@ -214,12 +215,16 @@ def fp_ecfc4_from_smiles(smi):
     return fp
 
 
-def add_fps(df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4") -> pd.DataFrame:
+def add_fps(
+    df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4"
+) -> pd.DataFrame:
     """Add a Fingerprint column to the DataFrame.
     Available types: ECFC4 (default), ECFC6, ECFP4, ECFP6, FCFP4, FCFP6.
     """
     assert RDKIT, "RDKit is not installed."
-    assert fp_type in FPDICT, f"Unknown fingerprint type: {fp_type}. Available fingerprints are: {", ".join(FPDICT.keys())}"
+    assert (
+        fp_type in FPDICT
+    ), f"Unknown fingerprint type: {fp_type}. Available fingerprints are: {', '.join(FPDICT.keys())}"
 
     def _calc_fp(smi):
         mol = smiles_to_mol(smi)
@@ -227,9 +232,9 @@ def add_fps(df: pd.DataFrame, smiles_col="Smiles", fp_col="FP", fp_type="ECFC4")
             return np.nan
         fp = FPDICT[fp_type](mol)
         return fp
-    
+
     df = df.copy()
-    
+
     if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
         df[fp_col] = df[smiles_col].progress_apply(lambda x: _calc_fp(x))
     else:
@@ -241,7 +246,7 @@ def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataF
     """Add a ErG fingerprint columns to the DataFrame.
     Because the bits are inherently explainable, each of the 315 positions
     gets its own column. This function resets the index.
-    
+
     Parameters:
     ===========
     df: pd.DataFrame
@@ -250,7 +255,7 @@ def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataF
         The column containing the SMILES strings. Default: "Smiles"
     prefix: str
         The prefix for the new columns. Can be None or an empty string. Default: "ErG"
-    
+
     Returns:
     ========
     A DataFrame with the added 315 ErG fingerprint columns.
@@ -269,7 +274,9 @@ def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataF
     for idx1 in range(prop_len):
         for idx2 in range(idx1, prop_len):
             for dist in range(1, 16):
-                positions.append(f"{prefix}_{properties[idx1]}_{properties[idx2]}_{dist}")
+                positions.append(
+                    f"{prefix}_{properties[idx1]}_{properties[idx2]}_{dist}"
+                )
     assert len(positions) == fp_len, f"Expected 315 positions, got {len(positions)}"
 
     def _calc_fp(smi):
@@ -279,25 +286,26 @@ def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataF
         fp = ERG.GetErGFingerprint(mol)
         return fp
 
-    
     df = df.copy()
     df = df.reset_index(drop=True)
-    
+
     if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
         df["_ErG_FP"] = df[smiles_col].progress_apply(lambda x: _calc_fp(x))
     else:
         df["_ErG_FP"] = df[smiles_col].apply(lambda x: _calc_fp(x))
-       
-    # Split the 315 bits into separate columns: 
+
+    # Split the 315 bits into separate columns:
     df_fp_cols = pd.DataFrame(df["_ErG_FP"].tolist(), columns=positions)
-    assert len(df) == len(df_fp_cols), f"Length mismatch: {len(df)} != {len(df_fp_cols)}"
-    
+    assert len(df) == len(
+        df_fp_cols
+    ), f"Length mismatch: {len(df)} != {len(df_fp_cols)}"
+
     # Remove the original column:
     df = df.drop(columns=["_ErG_FP"])
-    
+
     # Merge with original DataFrame:
     df = pd.concat([df, df_fp_cols], axis=1)
-    
+
     return df
 
 
@@ -633,7 +641,7 @@ def standardize_mol(
         if mol is np.nan:
             return np.nan
     if canonicalize_tautomer:
-        try: 
+        try:
             TautomerParentInPlace(mol)
             mol = check_mol(mol)
         except:
@@ -669,9 +677,7 @@ def standardize_smiles(
     return result
 
 
-def standardize_df(
-        df, 
-        smiles_col="Smiles", **kwargs) -> DataFrame:
+def standardize_df(df, smiles_col="Smiles", **kwargs) -> DataFrame:
     """Standardize the structures in the DataFrame.
     The Smiles column is replaced by the standardized Smiles.
 
@@ -690,7 +696,7 @@ def standardize_df(
         Whether to standardize the molecule. Default: True
     remove_stereo: bool
         Whether to remove stereochemistry. Default: False
-    
+
     Returns:
     ========
     A DataFrame with the standardized Smiles.
@@ -711,12 +717,13 @@ def add_desc(df, smiles_col="Smiles", filter_nans=True) -> DataFrame:
     if filter_nans is True, rows with NANs are removed.
     Returns: the DataFrame with the added columns."""
 
-    fscore = npscorer.readNPModel() 
+    fscore = npscorer.readNPModel()
+
     def _score_np(mol):
         return npscorer.scoreMol(mol, fscore)
-    
+
     descriptors = {
-        "NP_Like": lambda x: round(_score_np(x), 2), 
+        "NP_Like": lambda x: round(_score_np(x), 2),
         "QED": lambda x: round(QED.default(x), 3),
         "NumHA": lambda x: x.GetNumAtoms(),
         "MW": lambda x: round(Desc.MolWt(x), 2),
@@ -728,16 +735,12 @@ def add_desc(df, smiles_col="Smiles", filter_nans=True) -> DataFrame:
         "LogP": lambda x: round(Desc.MolLogP(x), 2),
         "TPSA": lambda x: round(rdMolDesc.CalcTPSA(x), 2),
         "NumRotBd": rdMolDesc.CalcNumRotatableBonds,
-        "NumAtOx": lambda x: len(
-            [a for a in x.GetAtoms() if a.GetAtomicNum() == 8]
-        ),
-        "NumAtN": lambda x: len(
-            [a for a in x.GetAtoms() if a.GetAtomicNum() == 7]
-        ),
+        "NumAtOx": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 8]),
+        "NumAtN": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 7]),
         "NumAtHal": Fragments.fr_halogen,
         "NumAtBridgehead": rdMolDesc.CalcNumBridgeheadAtoms,
-        "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3), 
-        "nSPS": lambda x: round(SPS(x), 2),   # normalizing is the default
+        "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3),
+        "nSPS": lambda x: round(SPS(x), 2),  # normalizing is the default
     }
     desc_keys = list(descriptors.keys())
     df = df.copy()
@@ -1260,8 +1263,7 @@ def sss(
 
 
 def sim_search(
-    df: pd.DataFrame, query: str, cutoff: float, 
-    fp_col="FP", fp_type="ECFC4"
+    df: pd.DataFrame, query: str, cutoff: float, fp_col="FP", fp_type="ECFC4"
 ) -> pd.DataFrame:
     """Tanimoto similarity search on a Fingerprint column (default: `FP`) of the DataFrame.
     Returns a new DF with only the matches."""
@@ -1279,7 +1281,7 @@ def sim_search(
 
     assert fp_type in FPDICT, f"Unknown fingerprint type: {fp_type}."
     assert 0.0 <= cutoff <= 1.0, "Cutoff must be between 0 and 1"
-    
+
     if isinstance(query, str):
         qmol = smiles_to_mol(query)
     else:  # Assume query is already a mol
@@ -1304,7 +1306,9 @@ def sim_search(
     return df
 
 
-def read_tsv(input_tsv: str, sep="\t", encoding="utf-8", index_col=None) -> pd.DataFrame:
+def read_tsv(
+    input_tsv: str, sep="\t", encoding="utf-8", index_col=None
+) -> pd.DataFrame:
     """Read a tsv file
 
     Parameters:
@@ -1318,9 +1322,13 @@ def read_tsv(input_tsv: str, sep="\t", encoding="utf-8", index_col=None) -> pd.D
     if isinstance(input_tsv, str):
         input_tsv = input_tsv.replace("file://", "")
     p_input_tsv = Path(input_tsv)
-    df = pd.read_csv(p_input_tsv, sep=sep, encoding=encoding, low_memory=False, index_col=index_col)
+    df = pd.read_csv(
+        p_input_tsv, sep=sep, encoding=encoding, low_memory=False, index_col=index_col
+    )
     if INTERACTIVE:
-        time_stamp = datetime.datetime.fromtimestamp(p_input_tsv.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+        time_stamp = datetime.datetime.fromtimestamp(
+            p_input_tsv.stat().st_mtime
+        ).strftime("%Y-%m-%d %H:%M")
         info(df, f"read_tsv (mod.: {time_stamp})")
     return df
 
@@ -1562,7 +1570,10 @@ def filter(
     two separate dataframes.
 
     Returns: passing and failing dataframe."""
-    df_pass = df[mask].copy()
+    if isinstance(mask, str):
+        df_pass = df.query(mask).copy()
+    else:
+        df_pass = df[mask].copy()
     df_fail = df[~df.index.isin(df_pass.index)].copy()
     if reset_index:
         df_pass = df_pass.reset_index(drop=True)

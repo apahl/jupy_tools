@@ -38,8 +38,7 @@ from rdkit.Chem.MolStandardize.rdMolStandardize import (
     # IsotopeParentInPlace,
     TautomerParentInPlace,
     ChargeParentInPlace,
-    
-    StereoParentInPlace
+    StereoParentInPlace,
 )
 
 
@@ -53,7 +52,7 @@ DEBUG = False
 def check_mol(mol: Mol) -> Mol | None:
     """Check whether mol is indeed an instance of RDKit mol object,
     and not np.nan or None.
-    Make also sure that the mol can be round-tripped to Smiles and back."""	
+    Make also sure that the mol can be round-tripped to Smiles and back."""
     if not isinstance(mol, Mol):
         return None
     smi = mol_to_smiles(mol)
@@ -213,7 +212,9 @@ def csv_supplier(fo, dialect):
             val = row[prop]
             if not prop in str_props:
                 val = get_value(val)
-                if isinstance(val, str) and len(val) > 0:  # missing value does not mean string prop
+                if (
+                    isinstance(val, str) and len(val) > 0
+                ):  # missing value does not mean string prop
                     str_props.add(prop)
             d[prop] = val
         yield d
@@ -230,7 +231,7 @@ def sdf_supplier(fo):
         if mol is None:
             yield {"Mol": None}
             continue
-            
+
         d = {}
         # Is the SD file name property used?
         name = mol.GetProp("_Name")
@@ -243,7 +244,9 @@ def sdf_supplier(fo):
             val = val.strip()
             if not prop in str_props:
                 val = get_value(val)
-                if isinstance(val, str) and len(val) > 0:  # missing value does not mean string prop
+                if (
+                    isinstance(val, str) and len(val) > 0
+                ):  # missing value does not mean string prop
                     str_props.add(prop)
             # Clean up the strings (2):
             if prop in str_props:
@@ -396,16 +399,21 @@ def process(
         for rec in reader:
             ctr["In"] += 1
             mol = rec["Mol"]
-            if mol is None :
+            if mol is None:
                 ctr["Fail_NoMol"] += 1
+                rec["Entry"] = f'Entry:{ctr["In"]}'
                 rec["Reason"] = "NoMol from Reader"
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
             mol = check_mol(mol)
-            if mol is None :
+            if mol is None:
                 ctr["Fail_NoMol"] += 1
                 rec["Reason"] = "NoMol from Reader after check_mol"
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
             if first_mol:
                 first_mol = False
@@ -444,13 +452,17 @@ def process(
             mol = check_mol(mol)
             if mol is None:
                 ctr["Fail_NoMol"] += 1
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
             RemoveFragmentsInPlace(mol)
             mol = check_mol(mol)
             if mol is None:
                 ctr["Fail_NoMol"] += 1
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
             try:
                 # This can give an exception
@@ -458,13 +470,17 @@ def process(
             except:
                 ctr["Fail_NoMol"] += 1
                 rec["Reason"] = "NoMol from ChargeParentInPlace"
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
             mol = check_mol(mol)
             if mol is None:
                 ctr["Fail_NoMol"] += 1
                 rec["Reason"] = "NoMol from ChargeParentInPlace after check_mol"
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
 
             # Racemize all stereocenters
@@ -474,7 +490,9 @@ def process(
                 if mol is None:
                     ctr["Fail_NoMol"] += 1
                     rec["Reason"] = "NoMol from StereoParentInPlace after check_mol"
-                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                    failfile.write(
+                        "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                    )
                     continue
 
             if deglyco:
@@ -491,7 +509,9 @@ def process(
                 if mol is None:
                     ctr["Fail_Deglyco"] += 1
                     rec["Reason"] = "NoMol from deglycosylate after check_mol"
-                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                    failfile.write(
+                        "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                    )
                     mol = mol_copy
                 if mol.GetNumAtoms() < num_atoms:
                     ctr["Deglyco"] += 1
@@ -502,7 +522,9 @@ def process(
                 if mol is None:
                     ctr["Fail_NoMol"] += 1
                     rec["Reason"] = "NoMol from MurckoScaffold after check_mol"
-                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                    failfile.write(
+                        "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                    )
                     continue
 
             if canon == "none" or canon == "cxcalc":
@@ -514,7 +536,9 @@ def process(
                 except:
                     ctr["Fail_NoMol"] += 1
                     rec["Reason"] = "NoMol from MolToInchiKey"
-                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                    failfile.write(
+                        "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                    )
                     continue
                 if not keep_dupl:
                     if inchi in inchi_keys:
@@ -543,7 +567,7 @@ def process(
                 # Late canonicalization, because it is so expensive:
                 # `TautomerParentInPlace` can give an exception, so we have to catch it.
                 # mol_copy = deepcopy(mol)
-                try: 
+                try:
                     TautomerParentInPlace(mol)
                     mol = check_mol(mol)
                 except:
@@ -552,14 +576,18 @@ def process(
                 if mol is None:
                     ctr["Fail_NoMol"] += 1
                     rec["Reason"] = "NoMol from TautomerParentInPlace after check_mol"
-                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                    failfile.write(
+                        "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                    )
                     continue
                 try:
                     inchi = Chem.inchi.MolToInchiKey(mol)
                 except:
                     ctr["Fail_NoMol"] += 1
                     rec["Reason"] = "NoMol from MolToInchiKey (rdkit)"
-                    failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                    failfile.write(
+                        "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                    )
                     continue
                 if not keep_dupl:
                     # When canonicalization IS performed,
@@ -574,7 +602,9 @@ def process(
             if smi is None:
                 ctr["Fail_NoMol"] += 1
                 rec["Reason"] = "NoMol from MolToSmiles"
-                failfile.write("\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n")
+                failfile.write(
+                    "\t".join([str(rec[x]) for x in rec if rec != "Mol"]) + "\n"
+                )
                 continue
             d["Smiles"] = smi
             ctr["Out"] += 1
