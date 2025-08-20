@@ -7,14 +7,14 @@ Add Descriptors to files
 
 *Created on Sun Dec 15 2024 17:45 by A. Pahl*
 
-Add descriptors (and later maybe also fingerprints) to a set of files 
+Add descriptors (and later maybe also fingerprints) to a set of files
 containing Smiles and InChIKeys.
-The entries in each file are deduplicated by InChIKey.
-If the InChIKey is not present in the file, it is calculated from the Smiles, 
+(The entries in each file are deduplicated by InChIKey.)
+Changed on 20-Aug-2025: The structures are not deduplicated. Duplicate entries are logged, but not removed.
+If the InChIKey is not present in the file, it is calculated from the Smiles,
 but no standardization is performed on the structures.
 Use the `stand_struct` script for this purpose before."""
 
-import os
 import sys
 import gzip
 import csv
@@ -29,6 +29,7 @@ from rdkit.Chem.SpacialScore import SPS
 from rdkit.Chem import Descriptors as Desc
 from rdkit.Chem import rdMolDescriptors as rdMolDesc
 from rdkit.Chem import Fragments
+
 # from rdkit.Chem import Draw
 # from rdkit.Chem.Draw import IPythonConsole
 
@@ -37,16 +38,18 @@ from rdkit import RDLogger
 
 LOG = RDLogger.logger()
 LOG.setLevel(RDLogger.CRITICAL)
-DEBUG = True
+DEBUG = False
 
 
 FSCORE = npscorer.readNPModel()
+
+
 def score_np(mol):
     return npscorer.scoreMol(mol, FSCORE)
 
 
 DESC = {
-    "NP_Like": lambda x: round(score_np(x), 2), 
+    "NP_Like": lambda x: round(score_np(x), 2),
     "QED": lambda x: round(QED.default(x), 3),
     "NumHA": lambda x: x.GetNumAtoms(),
     "MW": lambda x: round(Desc.MolWt(x), 2),
@@ -58,19 +61,15 @@ DESC = {
     "LogP": lambda x: round(Desc.MolLogP(x), 2),
     "TPSA": lambda x: round(rdMolDesc.CalcTPSA(x), 2),
     "NumRotBd": rdMolDesc.CalcNumRotatableBonds,
-    "NumAtOx": lambda x: len(
-        [a for a in x.GetAtoms() if a.GetAtomicNum() == 8]
-    ),
-    "NumAtN": lambda x: len(
-        [a for a in x.GetAtoms() if a.GetAtomicNum() == 7]
-    ),
+    "NumAtOx": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 8]),
+    "NumAtN": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 7]),
     "NumAtHal": Fragments.fr_halogen,
     "NumAtBridgehead": rdMolDesc.CalcNumBridgeheadAtoms,
-    "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3), 
-    "nSPS": lambda x: round(SPS(x), 2),   # normalizing is the default
+    "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3),
+    "nSPS": lambda x: round(SPS(x), 2),  # normalizing is the default
 }
 
-# TODO: Add for v2: 
+# TODO: Add for v2:
 #   Misc: SA_Score
 #   rdMolDesc
 #      CalcNumSpiroAtoms (maybe, or is this too rare?),
@@ -78,8 +77,8 @@ DESC = {
 #      CalcNumAliphaticCarbocycles, CalcNumAliphaticHeterocycles,
 #      CalcNumAromaticCarbocycles, CalcNumAromaticHeterocycles,
 #      CalcNumHeterocycles,
-#      CalcNumSaturatedCarbocycles, CalcNumSaturatedHeterocycles, CalcNumSaturatedRings, 
-#      
+#      CalcNumSaturatedCarbocycles, CalcNumSaturatedHeterocycles, CalcNumSaturatedRings,
+#
 #   custom.NumBasic, custom.NumAcid (see Logseq Todos)
 #   "main" becomes equivalent to "v1" (change ArgParser)
 
@@ -87,7 +86,7 @@ DESC = {
 def check_mol(mol: Mol) -> bool:
     """Check whether mol is indeed an instance of RDKit mol object,
     and not np.nan or None."""
-    return isinstance(mol, Mol)    
+    return isinstance(mol, Mol)
 
 
 def get_value(str_val):
@@ -246,13 +245,11 @@ def process(
             else:
                 inchi = d["InChIKey"]
             if inchi in inchi_keys:
-                ctr["Duplicates"] += 1
                 if DEBUG:
                     line = "\t".join([str(rec[x]) for x in rec if x != "Mol"])
                     print(f"\n\nDuplicate InChIKey: {inchi} for {line}")
-                continue
+                ctr["Duplicates"] += 1
             inchi_keys.add(inchi)
-
 
             # Finally calculate the descriptors:
             for desc in DESC:
@@ -268,7 +265,7 @@ def process(
             ctr["Out"] += 1
             line = [str(d[x]) for x in header]
             outfile.write("\t".join(line) + "\n")
-            
+
             if ctr["In"] % 1000 == 0:
                 print(
                     f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
@@ -284,7 +281,7 @@ def process(
         f"{fn_info} In: {ctr['In']:8d}  Out: {ctr['Out']: 8d}  Failed: {ctr['Fail_NoMol']:5d}  "
         f"Dupl: {ctr['Duplicates']:6d}   done.",
     )
- 
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -310,7 +307,10 @@ that are useful for Machine Learning and PCA visualizations of datasets:
         help="The optionally gzipped input file (CSV, TSV). Can also be a comma-separated list of file names.",
     )
     parser.add_argument(
-        "--desc_main", action="store_true", help="Add set of main descriptors (default action when no arguments are given).")
+        "--desc_main",
+        action="store_true",
+        help="Add set of main descriptors (default action when no arguments are given).",
+    )
     parser.add_argument(
         "-v",
         action="store_true",
