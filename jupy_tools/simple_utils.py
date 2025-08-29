@@ -97,6 +97,96 @@ def timestamp(show=True):
         return info_string
 
 
+class Results:
+    """
+    A utility class for collecting, displaying, and formatting result entries.
+
+    Features:
+    - Stores results as a list of (name, value) tuples.
+    - Provides pretty-printing in text and HTML (for Jupyter notebooks).
+    - Supports adding, removing, and temporarily displaying results.
+    - Can clear all results or remove the last n entries.
+
+    Methods:
+        add(*res, show=True): Add one or more result tuples or section headers.
+        remove(n): Remove the last n entries.
+        tmp(*res): Temporarily add and show entries, then remove them.
+        clear(): Remove all entries.
+        show(idx=0): Return a formatted string of results from idx onward.
+        to_html(): Return a pandas DataFrame of results (for Jupyter display).
+    """
+
+    def __init__(self, headers=["Result", "Value"]):
+        self.headers = headers
+        self.list = []
+
+    def show(self, idx: int = 0):
+        col0_max = max([len(x[0]) for x in self.list[idx:]])
+        col1_max = max([len(x[1]) for x in self.list[idx:]])
+        if col0_max < len(self.headers[0]):
+            col0_max = len(self.headers[0])
+        if col1_max < len(self.headers[1]):
+            col1_max = len(self.headers[1])
+        sep = "―" * (col0_max + col1_max + 2)
+        out = [f"{self.headers[0]:{col0_max}s}  {self.headers[1]:>{col1_max}s}"]
+        out.append(sep)
+        for rn, r in enumerate(self.list[idx:]):
+            if rn == 0 and r[0] == " ":
+                continue  # skip empty line if it is the first line to show (can happen for `idx` > 0)
+            out.append(f"{r[0]:{col0_max}s}  {r[1]:>{col1_max}s}")
+        return "\n".join(out)
+
+    def __str__(self):
+        return self.show()
+
+    def __repr__(self):
+        return self.show()
+
+    def to_html(self):
+        if NOTEBOOK:
+            return pd.DataFrame.from_records(self.list, columns=self.headers)
+        else:
+            return ""
+
+    def add(self, *res, show=True):
+        """Add one or more result tuples to the instance.
+        Show the added entries."""
+        idx = len(self.list)
+        for r in res:
+            if isinstance(r, str):
+                if len(self.list) > 0:
+                    self.list.append((" ", " "))
+                self.list.append((r, " "))
+                continue
+            r = list(r)
+            if len(r) < 2:
+                r.append(" ")
+                if len(self.list) > 0:
+                    self.list.append((" ", " "))
+            else:
+                r[0] = "• " + r[0]
+                if isinstance(r[1], float):
+                    r[1] = f"{r[1]:.3f}"
+                else:
+                    r[1] = str(r[1])
+            self.list.append(r)
+        if show:
+            print(self.show(idx))
+
+    def remove(self, n):
+        """Remove the n last entries."""
+        self.list = self.list[:-n]
+
+    def tmp(self, *res):
+        """Temporarily add an entry.
+        During development. Add, show, delete."""
+        self.add(res)
+        self.remove(len(res))
+
+    def clear(self):
+        self.list = []
+
+
 def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
     """log-printing for different kind of objects"""
     if label is not None:
@@ -305,6 +395,21 @@ def replace_nans(
                 f"{num_nans:4d} values replaced.",
             )
     return result
+
+
+def drop_cols(df: pd.DataFrame, cols: Union[str, List[str]]) -> pd.DataFrame:
+    """Remove the column or the list of columns from the dataframe.
+    Listed columns that are not available in the dataframe are simply ignored."""
+    if not isinstance(cols, list):
+        cols = [cols]
+    shape1 = df.shape
+    df = df.copy()
+    cols_to_remove = set(cols).intersection(set(df.keys()))
+    df = df.drop(cols_to_remove, axis=1)
+    shape2 = df.shape
+    if INTERACTIVE:
+        info(df, "drop_cols", f"{shape1[1] - shape2[1]:2d} columns removed.")
+    return df
 
 
 def reorder_list(lst: List[Any], take: Union[List[Any], Any], front=True) -> List[Any]:
@@ -695,7 +800,7 @@ def timeout(time):
 
 
 # Pandas extensions
-def pandas_info():
+def pandas_extensions():
     """Adds the following extensions to the Pandas DataFrame:
     - `iquery`: same as the DF `query`, but prints info about the shape of the result.
     - `ifilter`

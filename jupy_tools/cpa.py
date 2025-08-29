@@ -768,7 +768,7 @@ def get_func_cluster_features(cluster: str, include_well_id=True) -> pd.DataFram
 
 
 def add_func_clusters(
-    df: pd.DataFrame, clusters: Optional[List[str]] = None
+    df: pd.DataFrame, clusters: Optional[List[str]] = None, id_col: str = "Well_Id"
 ) -> pd.DataFrame:
     """Add the similarities to the functional clusters to the dataframe.
 
@@ -800,7 +800,8 @@ def add_func_clusters(
     result = df.copy()
     for cl in func_clusters:
         med_prof = pd.read_csv(op.join(OUTPUT_DIR, f"med_prof_{cl}.tsv"), sep="\t")
-        cl_feat = sorted([x for x in med_prof.keys() if x.startswith("Median_")])
+        # cl_feat = sorted([x for x in med_prof.keys() if x.startswith("Median_")])
+        cl_feat = sorted([x for x in med_prof.keys() if x != "Well_Id"])
         prof1 = med_prof[cl_feat].values[0]
         assert len(cl_feat) == len(prof1)
 
@@ -812,7 +813,7 @@ def add_func_clusters(
 
     # Find the cluster with the highest Sim for each compound:
     clusters = [f"Cluster_{cl}" for cl in func_clusters]
-    most_sim = {"Well_Id": [], "Cluster_High": [], "Cluster_Sim": []}
+    most_sim = {id_col: [], "Cluster_High": [], "Cluster_Sim": []}
     for _, rec in result.iterrows():
         sim = rec[clusters].max()
         for cl in clusters:
@@ -821,11 +822,11 @@ def add_func_clusters(
         else:
             # Fail-safe for comparing floats for equality.
             raise FloatingPointError(f"Could not find Sim {sim}.")
-        most_sim["Well_Id"].append(rec["Well_Id"])
+        most_sim[id_col].append(rec[id_col])
         most_sim["Cluster_High"].append(cl[8:])
         most_sim["Cluster_Sim"].append(sim)
 
-    result = result.merge(pd.DataFrame(most_sim), on="Well_Id", how="left")
+    result = result.merge(pd.DataFrame(most_sim), on=id_col, how="left")
     return result
 
 
@@ -1092,7 +1093,11 @@ def heat_mpl(
     if compartments:
         plt.xticks(xticks)
         plt.text(
-            xticks[1] // 2, -1.1, "Cells", horizontalalignment="center", fontsize=fs_text
+            xticks[1] // 2,
+            -1.1,
+            "Cells",
+            horizontalalignment="center",
+            fontsize=fs_text,
         )
         plt.text(
             xticks[1] + ((xticks[2] - xticks[1]) // 2),

@@ -6,7 +6,7 @@ My favourite Matplotlib styles."""
 import matplotlib.pyplot as plt
 
 plt.style.use("seaborn-v0_8-whitegrid")
-# plt.style.use("seaborn-white")
+# plt.style.use("seaborn-v0_8-white")
 # plt.style.use("seaborn-pastel")
 plt.style.use("seaborn-v0_8-poster")  # seaborn-talk
 plt.rcParams["axes.titlesize"] = 25
