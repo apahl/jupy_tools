@@ -238,8 +238,10 @@ def sdf_supplier(fo):
         if len(name) > 0:
             d["Name"] = get_value(name)
         for prop in mol.GetPropNames():
-            # Clean up the strings:
-            val = mol.GetProp(prop)
+            try:
+                val = mol.GetProp(prop)
+            except UnicodeDecodeError:
+                val = "<UnicodeDecodeError>"
             # Clean up the strings (1):
             val = val.strip()
             if not prop in str_props:

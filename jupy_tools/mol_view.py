@@ -280,7 +280,9 @@ class MolImage:
             # remove the opaque background ("<rect...") and skip the first line with the "<xml>" tag ("[1:]")
             if not opaque:
                 img_list = [
-                    line for line in img.splitlines()[1:] if not line.startswith("<rect")
+                    line
+                    for line in img.splitlines()[1:]
+                    if not line.startswith("<rect")
                 ]
                 img = "\n".join(img_list)
             if THEME == "dark":
@@ -308,10 +310,10 @@ class MolImage:
         if self.svg:
             img = bytes(self.txt, encoding="iso-8859-1")
             img = b64_mol(img)
-            self.b64 = f'data:image/svg+xml;base64,{img}'
+            self.b64 = f"data:image/svg+xml;base64,{img}"
         else:
             img = b64_mol(img)
-            self.b64 = f'data:image/png;base64,{img}'
+            self.b64 = f"data:image/png;base64,{img}"
         self.tag = f"""<img {options} src="{self.b64}" alt="{self.alt_text}"/>"""
 
     def save(self, fn):
@@ -879,5 +881,5 @@ def write_excel(df: pd.DataFrame, fn: str, smiles_col="Smiles", size=300):
     """Write the dataframe to an Excel file, containing the structures as images.
     This function uses the RDKit PandasTools module."""
     df = df.copy()
-    df["Mol"] = df[smiles_col].apply(utils.smiles_to_mol)
-    PandasTools.SaveXlsxFromFrame(df, fn, size=(size, size), molCol='Mol')
+    df = utils.add_mol_col(df, smiles_col=smiles_col)
+    PandasTools.SaveXlsxFromFrame(df, fn, size=(size, size), molCol="Mol")
