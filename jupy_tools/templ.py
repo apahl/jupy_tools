@@ -272,7 +272,7 @@ TABLE = {
 
 HEADERS = {
     "selector": "th",
-    "props": "text-align: center; font-size: 14pt; font-weight: bold; background-color: #94caef; border-collapse: collapse; border-width:thin; border-style: solid; border-color: black; padding: 5px; cursor: pointer;",
+    "props": "text-align: center; font-size: 14pt; font-weight: bold; background-color: #94caef; border-collapse: collapse; border-width:thin; border-style: solid; border-color: black; padding: 5px; cursor: pointer; position: sticky; top: 0; z-index: 1;",
 }
 
 CELLS = {
@@ -429,7 +429,6 @@ def page(content, title="Results", header=None, summary=None, options=PAGE_OPTIO
   font-family: freesans, arial, verdana, sans-serif;
 }
 th {
-  border-collapse: collapse;
   border-width: thin;
   border-style: solid;
   border-color: black;

@@ -767,6 +767,7 @@ def write_mol_table(
     drawing_options: Optional[DrawingOptions | List[DrawingOptions]] = None,
     svg: Optional[bool] = None,
     formatter=None,
+    index=True,
     **kwargs,
 ):
     """
@@ -799,6 +800,9 @@ def write_mol_table(
             If this is a list, each image column will be displayed with the corresponding options.
     """
     df = df.copy()
+    if index:
+        df = df.reset_index(drop=False)
+        df = df.rename(columns={"index": "#"})
     header = kwargs.pop("header", None)
     summary = kwargs.pop("summary", None)
 
@@ -830,6 +834,9 @@ def write_mol_table(
     # When there is only one structure column, put it in front:
     if len(smiles_col) == 1:
         cols = [smiles_col[0]] + [x for x in cols if x != smiles_col[0]]
+    # Put the index column even firster:
+    if index:
+        cols = ["#"] + [x for x in cols if x != "#"]
 
     # Add the image tags
     for idx, sc in enumerate(smiles_col):
@@ -861,12 +868,17 @@ def write_mol_table(
     )
 
     # style.to_html("output/stats_fcc/fcc_diff_aminergic_gpcr.html", escape=False)
-    html = style.to_html(None)
+
+    html = style.to_html(None, index=False, escape=False)
     lines = []
     for line in html.split("\n"):
         if "thead" in line:
             continue
         if "tbody" in line:
+            continue
+        if "blank level0" in line:
+            continue
+        if "row_heading level0" in line:
             continue
         lines.append(line)
     html = "\n".join(lines)
