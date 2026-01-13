@@ -270,7 +270,12 @@ def read_sdf(
             for prop in mol.GetPropNames():
                 if prop in sd_props:
                     mol_props.add(prop)
-                    d[prop].append(get_value(mol.GetProp(prop)))
+                    try:
+                        val = mol.GetProp(prop)
+                        val = get_value(val)
+                    except UnicodeDecodeError:
+                        val = "<UnicodeDecodeError>"
+                    d[prop].append(val)
                 mol.ClearProp(prop)
             if has_name:
                 d["Name"].append(get_value(mol.GetProp("_Name")))

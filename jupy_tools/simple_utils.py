@@ -20,6 +20,8 @@ from contextlib import contextmanager
 
 from typing import Any, Callable, List, Set, Tuple, Union
 
+from altair import value
+from altair import value
 import pandas as pd
 from pandas.core.frame import DataFrame
 
@@ -31,6 +33,7 @@ from multiprocessing import Pool
 INTERACTIVE = True
 MIN_NUM_RECS_PROGRESS = 500
 INFO_WIDTH = 35
+INDENT = 0
 
 
 def is_interactive_ipython():
@@ -290,11 +293,14 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
         what = f"{what} "
     shape = df.shape
     keys = ""
+    indent_str = " " * INDENT if INDENT > 0 else ""
     if shape[1] < 10:
         keys = ", ".join(df.keys())
         if len(keys) < 80:
             keys = f"( {keys} )"
-    print(f"{fn:{INFO_WIDTH}s}: [ {shape[0]:7d} / {shape[1]:3d} ] {what}{keys}")
+    print(
+        f"{indent_str}{fn:{INFO_WIDTH-INDENT}s}: [ {shape[0]:7d} / {shape[1]:3d} ] {what}{keys}"
+    )
 
 
 def get_value(str_val):
@@ -383,17 +389,92 @@ def replace_nans(
     for col in columns:
         mask = result[col].isna()
         num_nans = mask.sum()
-        if isinstance(value, str):
-            result[col] = result[col].astype(str)
-            result.loc[mask, col] = value
-        else:
-            result = result.fillna({col: value})
-        if INTERACTIVE:
-            info(
-                result,
-                f"replace_nans `{col[:INFO_WIDTH-15]}`",
-                f"{num_nans:4d} values replaced.",
-            )
+        if num_nans > 0:
+            if isinstance(value, str):
+                result[col] = result[col].astype(str)
+                result.loc[mask, col] = value
+            else:
+                result = result.fillna({col: value})
+            if INTERACTIVE:
+                info(
+                    result,
+                    f"replace_nans `{col[:INFO_WIDTH-15]}`",
+                    f"{num_nans:4d} values replaced.",
+                )
+    return result
+
+
+def replace_nans_all(
+    df: pd.DataFrame, default: Any, columns: dict[str, Any] = None
+) -> pd.DataFrame:
+    """Replace NaN values in a DataFrame with specified values.
+
+    Replaces NaN values in the DataFrame using column-specific replacement values
+    where provided, and a default value for all remaining columns. This function
+    handles both string and numeric replacements, converting columns to strings
+    when necessary for string replacements.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with potential NaN values.
+    default : Any
+        The default value to use for replacing NaN values in columns not
+        specified in the `columns` parameter.
+    columns : dict[str, Any], optional
+        A dictionary mapping column names to their replacement values. Each
+        column in this dictionary will have its NaN values replaced with the
+        corresponding value. Default is None.
+
+    Returns
+    -------
+    pd.DataFrame
+        A new DataFrame with NaN values replaced according to the specifications.
+        The original DataFrame is not modified.
+
+    Notes
+    -----
+    - If INTERACTIVE mode is enabled, the function prints information for each
+      column where NaN values are replaced.
+    - When replacing with string values, the column is converted to string type.
+    """
+
+    result = df.copy()
+    cols_all = set(result.columns)
+
+    if isinstance(columns, dict):
+        for col in columns:
+            cols_all = cols_all - {col}
+            mask = result[col].isna()
+            num_nans = mask.sum()
+            if num_nans > 0:
+                value = columns[col]
+                if isinstance(value, str):
+                    result[col] = result[col].astype(str)
+                    result.loc[mask, col] = value
+                else:
+                    result = result.fillna({col: value})
+                if INTERACTIVE:
+                    info(
+                        result,
+                        f"replace_nans `{col[:INFO_WIDTH-15]}`",
+                        f"{num_nans:4d} values replaced.",
+                    )
+    for col in cols_all:
+        mask = result[col].isna()
+        num_nans = mask.sum()
+        if num_nans > 0:
+            if isinstance(default, str):
+                result[col] = result[col].astype(str)
+                result.loc[mask, col] = default
+            else:
+                result = result.fillna({col: default})
+            if INTERACTIVE:
+                info(
+                    result,
+                    f"replace_nans `{col[:INFO_WIDTH-15]}`",
+                    f"{num_nans:4d} values replaced.",
+                )
     return result
 
 

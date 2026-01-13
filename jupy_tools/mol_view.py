@@ -417,9 +417,9 @@ def show_mols(mols_or_smiles, cols=5, size=IMG_GRID_SIZE, svg=None):
 
 def mol_grid(
     df,
-    drop=[],
-    keep=[],
-    hide=[],
+    drop=None,
+    keep=None,
+    hide=None,
     smiles_col="Smiles",
     mol_col="Mol",
     id_col="Compound_Id",
@@ -460,6 +460,12 @@ def mol_grid(
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
+    if drop is None:
+        drop = []
+    if keep is None:
+        keep = []
+    if hide is None:
+        hide = []
 
     if bar is not None:
         # Cluster profiles can only be shown when the Cell Painting module is available.
@@ -680,8 +686,8 @@ def write_mol_grid(
     df,
     title="MolGrid",
     fn="molgrid.html",
-    drop=[],
-    keep=[],
+    drop=None,
+    keep=None,
     smiles_col="Smiles",
     mol_col="Mol",
     id_col="Compound_Id",
@@ -717,6 +723,11 @@ def write_mol_grid(
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
+
+    if drop is None:
+        drop = []
+    if keep is None:
+        keep = []
 
     if "size" not in kwargs:
         kwargs["size"] = 300
