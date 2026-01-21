@@ -10,6 +10,7 @@ try:
 
     hv.extension("bokeh")
     from bokeh.models import HoverTool
+
     HOLOVIEWS = True
 
 except ImportError:
@@ -17,6 +18,7 @@ except ImportError:
     print("Holoviews is not available.")
 
 if HOLOVIEWS:
+
     def struct_hover(df, force=False, cols=[]):
         """Create a structure tooltip that can be used in Holoviews.
         Takes a MolFrame instance as parameter."""
@@ -24,10 +26,10 @@ if HOLOVIEWS:
         if "Smiles" in df.columns:
             if force or "Image" not in df.columns:
                 df = u.calc_from_smiles(
-                    df, "Image", lambda x: mv.MolImage(x, options='width="75%"').tag
+                    df, "Image", lambda x: mv.MolImage(x, svg=False, size=250).b64
                 )
             image_hover = """<div>
-                        @Image<br>
+                        <img src="@Image" alt="Mol" /><br>
                     </div>"""
         add_cols = []
         for col in cols:
@@ -47,7 +49,6 @@ if HOLOVIEWS:
             """
         )
         return df, hover
-
 
     def scatter(
         df,
@@ -99,7 +100,6 @@ if HOLOVIEWS:
         plot_styles["color"] = colorby
         opts = {"Scatter": {"plot": plot_options, "style": plot_styles}}
         return scatter.opts(opts)
-
 
     def save(plot, filename):
         """Save a plot to a file.

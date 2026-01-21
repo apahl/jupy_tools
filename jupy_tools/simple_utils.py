@@ -20,8 +20,6 @@ from contextlib import contextmanager
 
 from typing import Any, Callable, List, Set, Tuple, Union
 
-from altair import value
-from altair import value
 import pandas as pd
 from pandas.core.frame import DataFrame
 
@@ -638,7 +636,9 @@ def save_list(lst, fn="list.txt"):
             f.write(f"{line}\n")
 
 
-def load_list(fn="list.txt", as_type=str, skip_remarks=True, skip_empty=True):
+def load_list(
+    fn="list.txt", as_type=str, skip_remarks=True, skip_empty=True, encoding="utf-8"
+) -> List[Any]:
     """Read the lines of a text file into a list.
 
     Parameters:
@@ -652,7 +652,7 @@ def load_list(fn="list.txt", as_type=str, skip_remarks=True, skip_empty=True):
     A list of values of the given type.
     """
     result = []
-    with open(fn) as f:
+    with open(fn, encoding=encoding) as f:
         for line in f:
             line = line.strip()
             if skip_empty and len(line) == 0:
