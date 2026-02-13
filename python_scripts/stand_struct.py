@@ -44,6 +44,13 @@ from rdkit.Chem.MolStandardize.rdMolStandardize import (
 
 from rdkit import RDLogger
 
+WATERMARK = False
+try:
+    from watermark import watermark
+
+    WATERMARK = True
+except:
+    pass
 LOG = RDLogger.logger()
 LOG.setLevel(RDLogger.CRITICAL)
 DEBUG = False
@@ -719,6 +726,14 @@ def process(
 
 
 if __name__ == "__main__":
+    if WATERMARK:
+        print(
+            "VERSIONS (by watermark):",
+            "========================",
+            watermark(packages="rdkit,pandas,jupy_tools", python=True),
+            "========================",
+            sep="\n",
+        )
     parser = argparse.ArgumentParser(
         description="""
 Standardize structures. Input files can be CSV, TSV with the structures in a `Smiles` column

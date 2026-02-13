@@ -614,19 +614,43 @@ def write(fn, text):
         f.write(text)
 
 
-def write_tsv(df: pd.DataFrame, output_tsv: str, sep="\t"):
-    """Write a tsv file, converting the RDKit molecule column to smiles.
+def write_tsv(df: pd.DataFrame, fn: str, sep="\t", encoding="utf-8"):
+    """Write a tsv file.
 
     Parameters:
     ===========
-    input_tsv: Input tsv file
-
+    df: Input DataFrame
+    fn: Output file name
+    sep: Separator for the TSV file (default: TAB)
+    encoding: Encoding for the TSV file (default: utf-8)
     """
-    # The Mol column can not be saved to TSV in a meaningfull way,
+    # The Mol column can not be saved to TSV in a meaningful way,
     # so we remove it, if it is present.
     if "Mol" in df.keys():
         df = df.drop("Mol", axis=1)
-    df.to_csv(output_tsv, sep=sep, index=False)
+    df.to_csv(fn, sep=sep, index=False, encoding=encoding)
+
+
+def write_tsv_xls(df: pd.DataFrame, fn: str, sep="\t", encoding="utf-8"):
+    """Write a Dataframe to a tsv file and an Excel file.
+
+    Parameters:
+    ===========
+    df: Input DataFrame
+    fn: Output file name (the extension will be changed to .xlsx for the Excel file)
+    sep: Separator for the TSV file (default: TAB)
+    encoding: Encoding for the TSV file (default: utf-8)
+    """
+    base_fn, ext = op.splitext(fn)
+    # The Mol column can not be saved to TSV in a meaningful way,
+    # so we remove it, if it is present.
+    if "Mol" in df.keys():
+        df = df.drop("Mol", axis=1)
+    df.to_csv(fn, sep=sep, index=False, encoding=encoding)
+    df.to_excel(
+        f"{base_fn}.xlsx",
+        index=False,
+    )
 
 
 def save_list(lst, fn="list.txt"):
