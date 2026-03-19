@@ -303,8 +303,14 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
 
 def get_value(str_val):
     """convert a string into float or int, if possible."""
+    if isinstance(str_val, str):
+        str_val = str_val.strip()
+        if len(str_val) == 0:
+            return ""
     if not str_val:
         return np.nan
+    if isinstance(str_val, (int, float)):
+        return str_val
     try:
         if "." in str_val:
             val = float(str_val)
@@ -313,6 +319,15 @@ def get_value(str_val):
     except ValueError:
         val = str_val
     return val
+
+
+def is_number(val) -> bool:
+    """Check if the given value is a number (int or float)."""
+    try:
+        float(val)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) -> int:
@@ -522,7 +537,7 @@ def bring_to_front(df: pd.DataFrame, columns: Union[str, List[str]]) -> pd.DataF
             cols.remove(key)
         else:
             raise ValueError(f"Column `{key}` not in DataFrame")
-    cols = [key] + cols
+    cols = columns + cols
     return df[cols]
 
 

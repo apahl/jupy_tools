@@ -26,6 +26,7 @@ from .simple_utils import *
 
 try:
     from rdkit.Chem import AllChem as Chem, QED
+    from rdkit import rdBase
     from rdkit.Chem import Mol
     from rdkit.Chem import DataStructs
     from rdkit.Chem import rdqueries
@@ -302,6 +303,26 @@ def read_sdf(
     if INTERACTIVE:
         info(result, "read_sdf")
     return result
+
+
+def find_smiles_col(df: pd.DataFrame) -> str | None:
+    """Find the column containing the Smiles strings in the DataFrame.
+    The column name is case-insensitive and can contain "smiles" or "smi".
+    If multiple columns are found, the first one is returned.
+    If no column is found, None is returned."""
+
+    for col in df.columns:
+        # First try: look for "smiles" in the column name:
+        if "smiles" in col.lower() or "smi" in col.lower():
+            return col
+    # Second try: look for typical smiles element in a sample of the column values:
+    with rdBase.BlockLogs() as _:
+        for col in df.columns:
+            if df[col].dtype == "str":
+                sample = df.dropna().head(10)
+                if add_mol_col(sample, smiles_col=col).Mol.notna().all():
+                    return col
+    return None
 
 
 def mol_to_smiles(mol: Mol, canonical: bool = True) -> str:
