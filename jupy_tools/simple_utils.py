@@ -18,6 +18,25 @@ import signal
 import time
 from contextlib import contextmanager
 
+try:
+    from loguru import logger as log
+except ImportError:
+
+    class PrintLogger:
+        def debug(self, message):
+            print(f"[DEBUG]   {message}")
+
+        def info(self, message):
+            print(f"[INFO]    {message}")
+
+        def warning(self, message):
+            print(f"[WARNING] {message}")
+
+        def success(self, message):
+            print(f"[SUCCESS] {message}")
+
+    log = PrintLogger()
+
 from typing import Any, Callable, List, Set, Tuple, Union
 
 import pandas as pd
@@ -296,7 +315,7 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
         keys = ", ".join(df.keys())
         if len(keys) < 80:
             keys = f"( {keys} )"
-    print(
+    log.info(
         f"{indent_str}{fn:{INFO_WIDTH-INDENT}s}: [ {shape[0]:7d} / {shape[1]:3d} ] {what}{keys}"
     )
 
@@ -344,7 +363,7 @@ def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) ->
         nan_counts.append(df[col].isna().sum())
     if INTERACTIVE and len(columns) == 1:
         fn = "count_nans"
-        print(
+        log.info(
             f"{fn:25s}: [ {nan_counts[0]:6d}       ] rows with NAN values in col `{columns[0]}`"
         )
     return pd.DataFrame({"Column": column_list, "NANs": nan_counts})
@@ -370,7 +389,7 @@ def remove_nans(
     for col in column:
         result = result[result[col].notna()]
         if INTERACTIVE:
-            info(
+            log.info(
                 result,
                 f"remove_nans `{col[:INFO_WIDTH-14]}`",
                 f"{len(df) - len(result):4d} rows removed.",
