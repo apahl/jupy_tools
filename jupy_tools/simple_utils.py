@@ -36,6 +36,9 @@ except ImportError:
             print(f"[SUCCESS] {message}")
 
     log = PrintLogger()
+    log.warning(
+        "Loguru not found. Using PrintLogger as fallback. Install loguru for better logging."
+    )
 
 from typing import Any, Callable, List, Set, Tuple, Union
 
@@ -318,6 +321,40 @@ def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
     log.info(
         f"{indent_str}{fn:{INFO_WIDTH-INDENT}s}: [ {shape[0]:7d} / {shape[1]:3d} ] {what}{keys}"
     )
+
+
+def get_config_dir(name: str) -> tuple[str, bool]:
+    """Get the path to the configuration directory for the current user.
+    Returns: a tuple of the path and a boolean indicating whether the directory was created.
+    """
+    if "windows" in platform.system().lower():
+        config_dir = os.path.join(os.getenv("APPDATA"), name)
+    else:
+        config_dir = os.path.join(os.environ["HOME"], ".config", name)
+    created = False
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+        created = True
+    return config_dir, created
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize a filename by removing or replacing characters that are not allowed in filenames."""
+    # Define a set of allowed characters (alphanumeric and some special characters)
+    allowed_chars = set(
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_. "
+    )
+
+    sanitized = []
+    for c in filename:
+        if c in allowed_chars:
+            sanitized.append(c)
+        else:
+            sanitized.append("_")  # Replace disallowed characters with an underscore
+
+    # Remove characters that are not allowed
+    result = "".join(sanitized)
+    return result
 
 
 def get_value(str_val):
@@ -608,7 +645,11 @@ def read_tsv(
         input_tsv = input_tsv.replace("file://", "")
     p_input_tsv = Path(input_tsv)
     df = pd.read_csv(
-        p_input_tsv, sep=sep, encoding=encoding, low_memory=False, index_col=index_col
+        p_input_tsv,
+        sep=sep,
+        encoding=encoding,
+        low_memory=False,
+        index_col=index_col,
     )
     if INTERACTIVE:
         time_stamp = datetime.datetime.fromtimestamp(

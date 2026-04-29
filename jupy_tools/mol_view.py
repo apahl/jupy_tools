@@ -603,6 +603,9 @@ def mol_grid(
         mol_cells.extend(templ.td(cell, td_opt))
 
         if bar is not None:
+            rcparams = plt.rcParams.copy()
+            plt.rcParams["xtick.labelsize"] = 16
+            plt.rcParams["ytick.labelsize"] = 16
             plt.figure(figsize=(6, 6))
             bar_values = rec[bar].values
             chart = sns.barplot(x=bar, y=bar_values, color="#94caef")
@@ -618,6 +621,7 @@ def mol_grid(
             plt.clf()
             plt.close()
             gc.collect()
+            plt.rcParams.update(rcparams)
 
         if len(props) > 0:
             for prop_no, prop in enumerate(props):
