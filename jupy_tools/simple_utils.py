@@ -49,7 +49,6 @@ import numpy as np
 
 from multiprocessing import Pool
 
-
 INTERACTIVE = True
 MIN_NUM_RECS_PROGRESS = 500
 INFO_WIDTH = 35
@@ -683,9 +682,9 @@ def read_chunked_tsv(pattern: str, sep="\t") -> pd.DataFrame:
     return result
 
 
-def write(fn, text):
-    """Write text to a file."""
-    with open(fn, "w") as f:
+def write(fn, text, encoding="utf-8"):
+    """Write text to ,a file."""
+    with open(fn, "w", encoding=encoding) as f:
         f.write(text)
 
 

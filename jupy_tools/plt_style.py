@@ -22,6 +22,7 @@ def apply(name: str):
     """Apply the style to the current Matplotlib session."""
     assert name in [
         "default",
+        "no_grid",
         "medium_dark",
         "medium_light",
         "small_dark",
@@ -29,6 +30,17 @@ def apply(name: str):
     ], f"Style '{name}' is not defined."
     if name == "default":
         plt.style.use("seaborn-v0_8-whitegrid")
+        plt.style.use("seaborn-v0_8-poster")  # seaborn-talk
+        plt.rcParams["axes.titlesize"] = 25
+        plt.rcParams["axes.labelsize"] = 25
+        plt.rcParams["xtick.labelsize"] = 20
+        plt.rcParams["ytick.labelsize"] = 20
+        plt.rcParams["legend.title_fontsize"] = 20
+        plt.rcParams["legend.fontsize"] = 15
+        plt.rcParams["svg.fonttype"] = "none"
+        return
+    if name == "no_grid":
+        plt.style.use("seaborn-v0_8-white")
         plt.style.use("seaborn-v0_8-poster")  # seaborn-talk
         plt.rcParams["axes.titlesize"] = 25
         plt.rcParams["axes.labelsize"] = 25
