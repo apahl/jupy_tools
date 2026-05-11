@@ -493,7 +493,9 @@ def standardize_df(df, smiles_col="Smiles", **kwargs) -> DataFrame:
     return df
 
 
-def add_desc(df, smiles_col="Smiles", filter_nans=True) -> DataFrame:
+def add_desc(
+    df, smiles_col="Smiles", desc_cols: str | list[str] = None, filter_nans=True
+) -> DataFrame:
     """Add a set of standard RDKit descriptors to the DataFrame.
     The descriptors are added as new columns.
     if filter_nans is True, rows with NANs are removed.
@@ -524,6 +526,21 @@ def add_desc(df, smiles_col="Smiles", filter_nans=True) -> DataFrame:
         "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3),
         "nSPS": lambda x: round(SPS(x), 2),  # normalizing is the default
     }
+
+    if isinstance(desc_cols, list):
+        unknown = [key for key in desc_cols if key not in descriptors]
+        if len(unknown) > 0:
+            raise ValueError(
+                f"Unknown descriptors: {', '.join(unknown)}. Available descriptors are: {', '.join(descriptors.keys())}"
+            )
+        descriptors = {key: descriptors[key] for key in desc_cols}
+    elif isinstance(desc_cols, str):
+        if desc_cols not in descriptors:
+            raise ValueError(
+                f"Unknown descriptor: {desc_cols}. Available descriptors are: {', '.join(descriptors.keys())}"
+            )
+        descriptors = {desc_cols: descriptors[desc_cols]}
+
     desc_keys = list(descriptors.keys())
     df = df.copy()
     for key in desc_keys:

@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "19-Mar-2026 12:00h"
+__version__ = "04-May-2026 12:30h"
