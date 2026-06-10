@@ -18,9 +18,11 @@ Use the `stand_struct` script for this purpose before."""
 import sys
 import gzip
 import csv
+import base64 as b64
 import argparse
 
 import pandas as pd
+import numpy as np
 
 from rdkit.Chem import Mol
 from rdkit import DataStructs
@@ -28,6 +30,9 @@ from rdkit.Chem import AllChem as Chem, QED
 from rdkit.Chem.SpacialScore import SPS
 from rdkit.Chem import Descriptors as Desc
 from rdkit.Chem import rdMolDescriptors as rdMolDesc
+from rdkit.Chem import rdFingerprintGenerator
+from rdkit.Chem import rdReducedGraphs as ERG
+from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Chem import Fragments
 
 # from rdkit.Chem import Draw
@@ -69,18 +74,51 @@ DESC = {
     "nSPS": lambda x: round(SPS(x), 2),  # normalizing is the default
 }
 
+NBITS = 2048
+FPDICT = {}
+
+EFP4 = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=NBITS)
+EFP6 = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=NBITS)
+FFP4 = rdFingerprintGenerator.GetMorganGenerator(
+    radius=2,
+    fpSize=NBITS,
+    atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen(),
+)
+FFP6 = rdFingerprintGenerator.GetMorganGenerator(
+    radius=3,
+    fpSize=NBITS,
+    atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen(),
+)
+
+
+def encode_arr(arr):
+    s = " ".join(map(str, arr))
+    raw = gzip.compress(s.encode("utf-8"))
+    return b64.b64encode(raw).decode("ascii")
+
+
+# Leaving this here for completion, but it is not used in this script. It can be used for decoding the fingerprints in the output file into numpy arrays again.
+def decode_arr(text, dtype=np.int32):
+    raw = b64.b64decode(text.encode("ascii"))
+    s = gzip.decompress(raw).decode("utf-8")
+    return np.fromstring(s, sep=" ", dtype=dtype)
+
+
+FPDICT["ECFC4"] = lambda m: encode_arr(EFP4.GetCountFingerprintAsNumPy(m))
+FPDICT["ECFC6"] = lambda m: encode_arr(EFP6.GetCountFingerprintAsNumPy(m))
+FPDICT["ECFP4"] = lambda m: encode_arr(EFP4.GetFingerprintAsNumPy(m))
+FPDICT["ECFP6"] = lambda m: encode_arr(EFP6.GetFingerprintAsNumPy(m))
+FPDICT["FCFP4"] = lambda m: encode_arr(FFP4.GetFingerprintAsNumPy(m))
+FPDICT["FCFP6"] = lambda m: encode_arr(FFP6.GetFingerprintAsNumPy(m))
+FPDICT["ErG"] = lambda m: encode_arr(
+    np.float32(ERG.GetErGFingerprint(m))
+)  # Is directly a numpy array, no need for conversion
+FPDICT["Pharm2D"] = lambda m: encode_arr(
+    Generate.Gen2DFingerprint(m, Gobbi_Pharm2D.factory).ToList()
+)
+
 # TODO: Add for v2:
-#   Misc: SA_Score
-#   rdMolDesc
-#      CalcNumSpiroAtoms (maybe, or is this too rare?),
-#      CalcNumAmideBonds, CalcNumHeteroatoms
-#      CalcNumAliphaticCarbocycles, CalcNumAliphaticHeterocycles,
-#      CalcNumAromaticCarbocycles, CalcNumAromaticHeterocycles,
-#      CalcNumHeterocycles,
-#      CalcNumSaturatedCarbocycles, CalcNumSaturatedHeterocycles, CalcNumSaturatedRings,
-#
-#   custom.NumBasic, custom.NumAcid (see Logseq Todos)
-#   "main" becomes equivalent to "v1" (change ArgParser)
+#   Different sets of fingerprints (ECFC4, ECFC6, ECFP4, ECFP6, FCFP4, FCFP6, ErG, Pharmacophore)
 
 
 def check_mol(mol: Mol) -> bool:
@@ -150,13 +188,18 @@ def csv_supplier(fo, dialect):
 
 def process(
     fn: str,
-    desc_main: bool,
+    desc_list: list[str],
     verbose: bool,
 ):
 
     desc_str = ""
+    desc_main = "main" in desc_list
     if desc_main:
-        desc_str += "desc_main"
+        desc_list.remove("main")
+    if desc_main:
+        desc_str += "desc"
+    for dsc in desc_list:
+        desc_str += f"_{dsc.lower()}"
     header = []
     hd_set = set()
     ctr_columns = ["In", "Out", "Fail_NoMol", "Duplicates", "Filter"]
@@ -211,7 +254,10 @@ def process(
             if first_mol:
                 first_mol = False
                 header = [x for x in rec if not x in {"Mol", "Smiles", "InChIKey"}]
-                header.extend(sorted(DESC.keys()))
+                if desc_main:
+                    header.extend(sorted(DESC.keys()))
+                for dsc in desc_list:
+                    header.append(dsc)
                 # Put Smiles and InChIKey at the end:
                 header.extend(["Smiles", "InChIKey"])
                 if not "InChIKey" in rec:
@@ -252,14 +298,24 @@ def process(
             inchi_keys.add(inchi)
 
             # Finally calculate the descriptors:
-            for desc in DESC:
-                # XXXX
+            if desc_main:
+                for desc in DESC:
+                    # XXXX
+                    try:
+                        d[desc] = DESC[desc](mol)
+                    except:
+                        ctr["Fail_NoMol"] += 1
+                        if DEBUG:
+                            print(f"\nFailed to calculate {desc} for {d['Smiles']}")
+                        continue
+            # Also calculate the gzipped base64 encoded fingerprints:
+            for dsc in desc_list:
                 try:
-                    d[desc] = DESC[desc](mol)
+                    d[dsc] = FPDICT[dsc](mol)
                 except:
                     ctr["Fail_NoMol"] += 1
                     if DEBUG:
-                        print(f"\nFailed to calculate {desc} for {d['Smiles']}")
+                        print(f"\nFailed to calculate {dsc} for {d['Smiles']}")
                     continue
 
             ctr["Out"] += 1
@@ -298,7 +354,7 @@ Input files can be CSV, TSV with the structures in a `Smiles` column. The files 
 Example:
 Add the set of "main" descriptors (these are a set of, well, descriptive descriptors),
 that are useful for Machine Learning and PCA visualizations of datasets:
-    $ ./add_desc.py drugbank.tsv --desc_main
+    $ ./add_desc.py drugbank.tsv --desc main
             """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -309,7 +365,14 @@ that are useful for Machine Learning and PCA visualizations of datasets:
     parser.add_argument(
         "--desc_main",
         action="store_true",
-        help="Add set of main descriptors (default action when no arguments are given).",
+        help="Add set of main descriptors (default action when no arguments are given; DEPRECATED: use --desc main instead).",
+    )
+    parser.add_argument(
+        "--desc",
+        choices=["main"] + sorted(FPDICT.keys()),
+        nargs="+",
+        default=["main"],
+        help="Add set of descriptors and fingerprints to calculate, SEPARATED BY SPACES. The fingerprints are b64 encoded gzipped numpy arrays and can be decoded with the `decode_fp` function of the `utils` / `simple_utils` modules into numpy arrays again. Default: main",
     )
     parser.add_argument(
         "-v",
@@ -317,11 +380,13 @@ that are useful for Machine Learning and PCA visualizations of datasets:
         help="Turn on verbose status output.",
     )
     args = parser.parse_args()
-    if not args.desc_main:
-        args.desc_main = True
+    # args.in_file = "TEST"
+    if args.desc_main:
+        args.desc.append("main")
+    args.desc = sorted(set(args.desc))  # remove duplicates
 
     process(
         args.in_file,
-        args.desc_main,
+        args.desc,
         args.v,
     )

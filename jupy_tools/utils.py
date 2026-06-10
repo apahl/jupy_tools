@@ -70,6 +70,13 @@ try:
     FPDICT["FCFP4"] = lambda m: FFP4.GetFingerprint(m)
     FPDICT["FCFP6"] = lambda m: FFP6.GetFingerprint(m)
 
+    FPDICT["ECFC4NP"] = lambda m: EFP4.GetCountFingerprintAsNumPy(m)
+    FPDICT["ECFC6NP"] = lambda m: EFP6.GetCountFingerprintAsNumPy(m)
+    FPDICT["ECFP4NP"] = lambda m: EFP4.GetFingerprintAsNumPy(m)
+    FPDICT["ECFP6NP"] = lambda m: EFP6.GetFingerprintAsNumPy(m)
+    FPDICT["FCFP4NP"] = lambda m: FFP4.GetFingerprintAsNumPy(m)
+    FPDICT["FCFP6NP"] = lambda m: FFP6.GetFingerprintAsNumPy(m)
+
     from Contrib.NP_Score import npscorer
     from rdkit import rdBase
 
@@ -136,7 +143,7 @@ def add_fps(
 
 
 def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataFrame:
-    """Add a ErG fingerprint columns to the DataFrame.
+    """Add a ErG fingerprint column to the DataFrame.
     Because the bits are inherently explainable, each of the 315 positions
     gets its own column. This function resets the index.
 

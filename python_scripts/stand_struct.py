@@ -391,7 +391,7 @@ def process(
                 mode = " (gzipped)"
                 file_obj = gzip.open(f, mode="rt")
             else:
-                file_obj = open(f, "r")
+                file_obj = open(f, "r", encoding="utf-8")
             reader = csv_supplier(file_obj, dialect="excel")
         elif ".tsv" in f:
             file_type = "TSV"

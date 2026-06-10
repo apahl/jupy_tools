@@ -7,6 +7,8 @@ This is the simplified version without the RDKit functions.
 
 import os
 import os.path as op
+import gzip
+import base64 as b64
 from pathlib import Path
 import datetime
 import platform
@@ -383,6 +385,40 @@ def is_number(val) -> bool:
         return True
     except (ValueError, TypeError):
         return False
+
+
+def decode_fp_str(text: str, dtype: np.dtype) -> np.ndarray:
+    """Decode a fingerprint gzipped and base64 encoded string from the given text and return it as a numpy array."""
+    raw = b64.b64decode(text.encode("ascii"))
+    s = gzip.decompress(raw).decode("utf-8")
+    return np.fromstring(s, sep=" ", dtype=dtype)
+
+
+def decode_fp(
+    df: pd.DataFrame, fp_name: str, keep_original: bool = False
+) -> pd.DataFrame:
+    """Decode a gzipped and base64 encoded fingerprint column (e.g. created by the `add_desc` script) from the given DataFrame and return it as a numpy array. The dtype required for decoding is determined by the `fp_name` (ErG: float32, others: uint8). If `keep_original` is False (default), the original column will be removed from the result.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The DataFrame containing the encoded fingerprint column.
+    fp_name: str
+        The name of the encoded fingerprint column to decode.
+    keep_original: bool
+        Whether to keep the original fingerprint column in the result. Default is False.
+
+    Returns:
+    ========
+    A new DataFrame with the fingerprint column decoded into a numpy array.
+    """
+    dtype = np.float32 if fp_name == "ErG" else np.uint8
+    fp_dec = fp_name + "_NP"
+    result = df.copy()
+    result[fp_dec] = result[fp_name].apply(lambda x: decode_fp_str(x, dtype=dtype))
+    if not keep_original:
+        result = result.drop(columns=[fp_name])
+    return result
 
 
 def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) -> int:
