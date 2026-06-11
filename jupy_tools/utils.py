@@ -925,7 +925,11 @@ def inchi_from_smiles(
 
 
 def murcko_from_smiles(
-    df: pd.DataFrame, smiles_col="Smiles", murcko_col="Murcko_Smiles", filter_nans=True
+    df: pd.DataFrame,
+    smiles_col="Smiles",
+    murcko_col="Murcko_Smiles",
+    filter_nans=True,
+    add_inchikey=True,
 ) -> pd.DataFrame:
     """Generate Murcko scaffolds from Smiles.
     Molecules without any rings do not have a Murcko scaffold,
@@ -943,11 +947,13 @@ def murcko_from_smiles(
         The name of the column to store the Murcko scaffolds as Smiles (default: "MurckoSmiles").
     filter_nans: bool
         If True, remove rows with NaN in the Murcko column (default: True).
+    add_inchikey: bool
+        If True, generate the InChIKeys for the Murcko scaffolds (default: True).
 
     Returns:
     ========
     pd.DataFrame
-        The dataframe with the Murcko scaffolds and the InChIKeys of the scaffolds.
+        The dataframe with the Murcko scaffolds and, if `add_inchikey` is True, the InChIKeys of the scaffolds.
     """
 
     def _murcko(mol):
@@ -966,9 +972,10 @@ def murcko_from_smiles(
     df = calc_from_smiles(
         df, murcko_col, _murcko, smiles_col=smiles_col, filter_nans=False
     )
-    df = inchi_from_smiles(
-        df, smiles_col=murcko_col, inchi_col="Murcko_InChIKey", filter_nans=False
-    )
+    if add_inchikey:
+        df = inchi_from_smiles(
+            df, smiles_col=murcko_col, inchi_col="Murcko_InChIKey", filter_nans=False
+        )
     INTERACTIVE = interact_flag  # restore previous value
     if filter_nans:
         df = df[df[murcko_col].notna()]
