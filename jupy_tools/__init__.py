@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "10-Jun-2026 16:30h"
+__version__ = "14-Jun-2026 13:00h (Add fragment calc)"

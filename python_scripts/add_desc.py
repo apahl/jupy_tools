@@ -29,6 +29,7 @@ from rdkit import DataStructs
 from rdkit.Chem import AllChem as Chem, QED
 from rdkit.Chem.SpacialScore import SPS
 from rdkit.Chem import Descriptors as Desc
+from rdkit.Chem import Fragments
 from rdkit.Chem import rdMolDescriptors as rdMolDesc
 from rdkit.Chem import rdFingerprintGenerator
 from rdkit.Chem import rdReducedGraphs as ERG
@@ -73,6 +74,13 @@ DESC = {
     "FCsp3": lambda x: round(rdMolDesc.CalcFractionCSP3(x), 3),
     "nSPS": lambda x: round(SPS(x), 2),  # normalizing is the default
 }
+
+FRAGMENTS = {}
+for name in sorted(dir(Fragments)):
+    if name.startswith("fr_"):
+        func = getattr(Fragments, name)
+        if callable(func):
+            FRAGMENTS[name] = func
 
 NBITS = 2048
 FPDICT = {}
@@ -195,11 +203,18 @@ def process(
 ):
 
     desc_str = ""
-    desc_main = "main" in desc_list
-    if desc_main:
+    if "main" in desc_list:
+        desc_main = True
         desc_list.remove("main")
-    if desc_main:
-        desc_str += "desc"
+        desc_str += "_desc"
+    else:
+        desc_main = False
+    if "fragments" in desc_list:
+        desc_frags = True
+        desc_list.remove("fragments")
+        desc_str += "_frags"
+    else:
+        desc_frags = False
     for dsc in desc_list:
         desc_str += f"_{dsc.lower()}"
     header = []
@@ -212,7 +227,7 @@ def process(
     fn = fn.split(",")  # allow comma separated list of files
     first_dot = fn[0].find(".")
     fn_base = fn[0][:first_dot]
-    out_fn = f"{fn_base}_{desc_str}.tsv"
+    out_fn = f"{fn_base}{desc_str}.tsv"
     outfile = open(out_fn, "w", encoding="utf-8")
     # Initialize reader for the correct input type
     if verbose:
@@ -258,6 +273,8 @@ def process(
                 header = [x for x in rec if not x in {"Mol", "Smiles", "InChIKey"}]
                 if desc_main:
                     header.extend(sorted(DESC.keys()))
+                if desc_frags:
+                    header.extend(sorted(FRAGMENTS.keys()))
                 for dsc in desc_list:
                     header.append(dsc)
                 # Put Smiles and InChIKey at the end:
@@ -310,6 +327,18 @@ def process(
                         if DEBUG:
                             print(f"\nFailed to calculate {desc} for {d['Smiles']}")
                         continue
+
+            # Calculate the RDKit fragments
+            if desc_frags:
+                for name in FRAGMENTS:
+                    try:
+                        d[name] = FRAGMENTS[name](mol)
+                    except:
+                        ctr["Fail_NoMol"] += 1
+                        if DEBUG:
+                            print(f"\nFailed to calculate {name} for {d['Smiles']}")
+                        continue
+
             # Also calculate the gzipped base64 encoded fingerprints:
             for dsc in desc_list:
                 try:
@@ -371,7 +400,7 @@ that are useful for Machine Learning and PCA visualizations of datasets:
     )
     parser.add_argument(
         "--desc",
-        choices=["main"] + sorted(FPDICT.keys()),
+        choices=["main", "fragments"] + sorted(FPDICT.keys()),
         nargs="+",
         default=["main"],
         help="Add set of descriptors and fingerprints to calculate, SEPARATED BY SPACES. The fingerprints are b64 encoded gzipped numpy arrays and can be decoded with the `decode_fp` function of the `utils` / `simple_utils` modules into numpy arrays again. Default: main",
