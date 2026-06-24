@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "14-Jun-2026 13:00h (Add fragment calc)"
+__version__ = "24-Jun-2026 16:30h (Add column name option to layout_to_columns.py)"

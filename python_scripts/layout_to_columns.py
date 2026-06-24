@@ -18,18 +18,19 @@ import pandas as pd
 
 def show_help():
     print(textwrap.dedent("""\
-    This script converts plate layouts from the row / column wide format to a columnar format.
-    The resul file will always be named "layout.tsv" and will be written to the same directory as the input file.
+    This script converts plate layouts from the row / column wide format to a columnar format.  
+    Optionally, the user can specify a custom column name for the values.  
+    The result file will always be named "layout.tsv" and will be written to the same directory as the input file.
 
     Usage:
-        $ ./layout_to_columns.py <input_file>
+        $ ./layout_to_columns.py <input_file> [<column name>]
             
     Example:
-        $ ./layout_to_columns.py plate.txt
+        $ ./layout_to_columns.py plate.txt Cpd_Id
     """))
 
 
-def process(fn: Path):
+def process(fn: Path, col_name: str):
     base_dir = fn.parent
     rows = []
     columns = []
@@ -49,13 +50,13 @@ def process(fn: Path):
                 well = f"{chr(64 + row_ctr)}{col_ctr}"
                 wells.append(well)
                 values.append(col)
-    df = pd.DataFrame({"Row": rows, "Column": columns, "Well": wells, "Value": values})
+    df = pd.DataFrame({"Row": rows, "Column": columns, "Well": wells, col_name: values})
     df.to_csv(base_dir / "layout.tsv", sep="\t", index=False)
     print(f"Done. Output written to {base_dir / 'layout.tsv'}.")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
         show_help()
         sys.exit(1)
     if sys.argv[1] in ("-h", "--help"):
@@ -65,4 +66,7 @@ if __name__ == "__main__":
     if not fn.suffix == ".txt":
         print("Error: input file must be a .txt file.")
         sys.exit(1)
-    process(fn)
+    col_name = "Value"
+    if len(sys.argv) == 3:
+        col_name = sys.argv[2]
+    process(fn, col_name)
