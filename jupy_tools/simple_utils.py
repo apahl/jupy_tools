@@ -360,21 +360,20 @@ def sanitize_filename(filename: str) -> str:
 
 def get_value(str_val):
     """convert a string into float or int, if possible."""
+    if str_val is None:
+        return np.nan
     if isinstance(str_val, str):
         str_val = str_val.strip()
         if len(str_val) == 0:
             return ""
-    if not str_val:
-        return np.nan
-    if isinstance(str_val, (int, float)):
-        return str_val
-    try:
-        if "." in str_val:
-            val = float(str_val)
-        else:
-            val = int(str_val)
-    except ValueError:
-        val = str_val
+        try:
+            if "." in str_val:
+                val = float(str_val)
+            else:
+                val = int(str_val)
+        except ValueError:
+            return str_val
+    val = str_val
     return val
 
 
