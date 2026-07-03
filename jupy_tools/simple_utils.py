@@ -373,7 +373,8 @@ def get_value(str_val):
                 val = int(str_val)
         except ValueError:
             return str_val
-    val = str_val
+    else:
+        val = str_val
     return val
 
 

@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "24-Jun-2026 16:30h (Add column name option to layout_to_columns.py)"
+__version__ = "03-Jul-2026 16:30h (Fix `get_value`)"
