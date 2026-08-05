@@ -192,7 +192,12 @@ def csv_supplier(fo, dialect):
             else:
                 d["Mol"] = mol
         for prop in row:
-            d[prop] = get_value(row[prop])
+            try:
+                d[prop] = get_value(row[prop])
+            except Exception as e:
+                print(f"Error converting value for {prop}: {row[prop]} ({e})")
+                print(row)
+                raise e
         yield d
 
 

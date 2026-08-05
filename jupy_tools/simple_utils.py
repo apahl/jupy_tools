@@ -19,6 +19,7 @@ import uuid
 import signal
 import time
 from contextlib import contextmanager
+import warnings
 
 try:
     from loguru import logger as log
@@ -418,6 +419,170 @@ def decode_fp(
     result[fp_dec] = result[fp_name].apply(lambda x: decode_fp_str(x, dtype=dtype))
     if not keep_original:
         result = result.drop(columns=[fp_name])
+    return result
+
+
+def pic50(value: float, unit: str, digits: int = 2) -> float:
+    """Convert a value to its negative logarithm (base 10) representation, commonly used in pharmacology to express potency. The function returns the negative logarithm of the input value, rounded to two decimal places. If the input value is less than or equal to zero, the function returns NaN.
+
+    Parameters:
+    ===========
+    value: float
+        The input value to be converted.
+    unit: str
+        The concentration unit of the input value. Supported units are "M", "mM", "uM", and "nM".
+    digits: int
+        The number of decimal places to round the result to. Default is 2.
+
+    Returns:
+    ========
+    float
+        The negative logarithm (base 10) of the input value, rounded to two decimal places.
+        Returns NaN if the input value is less than or equal to zero.
+    """
+    if value <= 0:
+        return np.nan
+    assert unit in ["M", "mM", "uM", "nM"], f"Unknown concentration unit: {unit }"
+
+    if unit == "mM":
+        value *= 1e-3
+    elif unit == "uM":
+        value *= 1e-6
+    elif unit == "nM":
+        value *= 1e-9
+
+    return round(-np.log10(value), digits)
+
+
+def ic50(value: float, unit: str = None, digits: int = 2) -> float:
+    """Convert a negative logarithm (base 10) value back to its original concentration representation. The function returns the original value corresponding to the input negative logarithm, rounded to two decimal places. If the input value is NaN, the function returns NaN.
+
+    Parameters:
+    ===========
+    value: float
+        The negative logarithm (base 10) value to be converted.
+    unit: str
+        The desired concentration unit for the output value. Supported units are None, "M", "mM", "uM", and "nM".
+        (Default is None, which returns the value with the smallest unit that give a value >= 1.)
+    digits: int
+            The number of decimal places to round the result to. Default is 2.
+
+    Returns:
+    ========
+    float
+        The original concentration value corresponding to the input negative logarithm, rounded to two decimal places.
+        Returns NaN if the input value is NaN.
+    """
+    if np.isnan(value):
+        return np.nan
+    assert unit in [None, "M", "mM", "uM", "nM"], f"Unknown concentration unit: {unit}"
+
+    result = 10 ** (-value)
+    if unit is None:
+        if result < 1e-6:
+            unit = "nM"
+        elif result < 1e-3:
+            unit = "uM"
+        elif result < 1:
+            unit = "mM"
+        else:
+            unit = "M"
+
+    if unit == "mM":
+        result *= 1e3
+    elif unit == "uM":
+        result *= 1e6
+    elif unit == "nM":
+        result *= 1e9
+
+    return round(result, digits), unit
+
+
+def calc_pic50(
+    df: pd.DataFrame,
+    value_col: str,
+    unit_col: str,
+    result_col: str = None,
+    digits: int = 2,
+) -> pd.DataFrame:
+    """Calculate the negative logarithm (base 10) of the values in the specified column of a DataFrame, commonly used in pharmacology to express potency. The function adds a new column to the DataFrame with the calculated negative logarithm values.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The DataFrame containing the values to be converted.
+    value_col: str
+        The name of the column containing the values to be converted.
+    unit_col: str
+        The name of the column containing the concentration units of the values.
+    result_col: str
+        The name of the column to store the calculated negative logarithm values. Default is "pIC50".
+    digits: int
+            The number of decimal places to round the result to. Default is 2.
+
+    Returns:
+    ========
+    pd.DataFrame
+        A new DataFrame with the calculated negative logarithm values added as a new column.
+    """
+    if result_col is None:
+        result_col = value_col
+        if result_col.endswith("_IC50"):
+            result_col = result_col.replace("_IC50", "_pIC50")
+        else:
+            result_col = f"{result_col}_pIC50"
+
+    result = df.copy()
+    result[result_col] = result.apply(
+        lambda row: pic50(row[value_col], row[unit_col], digits=digits), axis=1
+    )
+    return result
+
+
+def calc_ic50(
+    df: pd.DataFrame,
+    value_col: str,
+    unit_col: str,
+    unit: str = None,
+    result_col: str = None,
+    digits: int = 2,
+) -> pd.DataFrame:
+    """Calculate the original concentration values from the negative logarithm (base 10) values in the specified column of a DataFrame. The function adds a new column to the DataFrame with the calculated original concentration values.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The DataFrame containing the negative logarithm values to be converted.
+    value_col: str
+        The name of the column containing the negative logarithm values to be converted.
+    unit_col: str
+        The name of the column containing the concentration units for the output values.
+    unit: str
+        The desired concentration unit for the output values. Supported units are None, "M", "mM", "uM", and "nM".
+        (Default is None, which returns the value with the smallest unit that gives a value >= 1.)
+    result_col: str
+        The name of the column to store the calculated original concentration values. Default is "IC50".
+    digits: int
+            The number of decimal places to round the result to. Default is 2.
+
+    Returns:
+    ========
+    pd.DataFrame
+        A new DataFrame with the calculated original concentration values added as a new column.
+    """
+    if result_col is None:
+        result_col = value_col
+        if result_col.endswith("_pIC50"):
+            result_col = result_col.replace("_pIC50", "_IC50")
+        else:
+            result_col = f"{result_col}_IC50"
+
+    result = df.copy()
+    result[[result_col, unit_col]] = result.apply(
+        lambda row: ic50(row[value_col], unit, digits=digits),
+        axis=1,
+        result_type="expand",
+    )
     return result
 
 
@@ -862,22 +1027,50 @@ def id_filter(df, id_list, id_col, reset_index=True, sort_by_input=False):
     return result
 
 
-def filter(
-    df: pd.DataFrame, mask, reset_index=True
+def split(
+    df: pd.DataFrame, query, reset_index=True
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Filters a dataframe and returns the passing fraction and the failing fraction as
     two separate dataframes.
 
-    Returns: passing and failing dataframe."""
-    df_pass = df[mask].copy()
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The DataFrame to be filtered.
+    query: Union[str, pd.Series]
+        A boolean mask or a query string to filter the DataFrame.
+    reset_index: bool
+        Whether to reset the index of the resulting DataFrames. Default is True.
+
+    Returns:
+    ========
+    Tuple[pd.DataFrame, pd.DataFrame]
+        A tuple containing two DataFrames: the first one with the rows that passed the filter, and the second one with the rows that failed the filter.
+    """
+
+    if isinstance(query, str):
+        df_pass = df.query(query).copy()
+    else:
+        df_pass = df[query].copy()
     df_fail = df[~df.index.isin(df_pass.index)].copy()
     if reset_index:
         df_pass = df_pass.reset_index(drop=True)
         df_fail = df_fail.reset_index(drop=True)
     if INTERACTIVE:
-        info(df_pass, "filter: pass")
-        info(df_fail, "filter: fail")
+        info(df_pass, "split: pass")
+        info(df_fail, "split: fail")
     return df_pass, df_fail
+
+
+def filter(
+    df: pd.DataFrame, query, reset_index=True
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """DEPRECATED. Use `split` instead."""
+    warnings.warn(
+        "filter() is deprecated and will be removed in future versions. Please use split() instead.",
+        DeprecationWarning,
+    )
+    return split(df, query, reset_index=reset_index)
 
 
 def inner_merge(

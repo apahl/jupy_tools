@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "03-Jul-2026 16:30h (Fix `get_value`)"
+__version__ = "05-Aug-2026 16:30h (Deprecate filter in favor of split)"
