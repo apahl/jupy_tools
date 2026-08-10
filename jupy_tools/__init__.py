@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "10-Aug-2026 12:45h (Add LabuteASA)"
+__version__ = "10-Aug-2026 14:00h (Set text tolor)"

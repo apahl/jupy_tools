@@ -3,6 +3,7 @@
 """
 Utilities for viewing DataFrames with molecules.
 """
+
 # import os.path as op
 
 import base64
@@ -457,6 +458,7 @@ def mol_grid(
         HTML table as TEXT with molecules in grid-like layout to embed in IPython or a web page.
     """
     fbgc = "#f4f4f4"  # field background color
+    txt_color = "#000000"  # text color
     if svg is None:
         svg = SVG
     assert isinstance(svg, bool)
@@ -512,7 +514,7 @@ def mol_grid(
             props.append(x)
     time_stamp = time.strftime("%y%m%d%H%M%S")
     td_opt = {"style": "text-align: center;"}
-    header_opt = {"bgcolor": BGCOLOR}
+    header_opt = {"bgcolor": BGCOLOR, "color": txt_color}
     table_list = []
     guessed_id = id_col
     if guessed_id not in df.keys():
@@ -625,8 +627,10 @@ def mol_grid(
 
         if len(props) > 0:
             for prop_no, prop in enumerate(props):
-                prop_opt = {"style": f"text-align: left; background-color: {fbgc};"}
-                val_opt = {"style": "text-align: left;"}
+                prop_opt = {
+                    "style": f"text-align: left; color: {txt_color}; background-color: {fbgc};"
+                }
+                val_opt = {"style": f"text-align: left; color: {txt_color}; "}
                 prop_cells = []
                 prop_val = ""
                 if prop in rec:
