@@ -626,7 +626,7 @@ def remove_nans(
     for col in column:
         result = result[result[col].notna()]
         if INTERACTIVE:
-            log.info(
+            info(
                 result,
                 f"remove_nans `{col[:INFO_WIDTH-14]}`",
                 f"{len(df) - len(result):4d} rows removed.",

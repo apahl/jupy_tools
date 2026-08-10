@@ -985,6 +985,75 @@ def murcko_from_smiles(
     return df
 
 
+def add_murcko_std(
+    df: pd.DataFrame, smiles_col="Smiles", col_prefix="Murcko_"
+) -> pd.DataFrame:
+    """Problem: Murcko scaffolds from standardized standardized do not give unified standardized Murcko scaffold Smiles and  Murcko InChIKey. For the same Murcko InChIKey, multiple Smiles can occur. This function assumes as input standardized structures Smiles and returns unique Murcko scaffolds per Murcko InChIKey by performing the following steps:
+
+    1. Generate Murcko scaffolds from the standardized Smiles.
+    2. Assign the arbitrary scaffold "C" to molecules without any rings (i.e. no Murcko scaffold).
+    3. Standardize the Murcko scaffolds.
+    4. Calculate Murcko InChIKeys
+    5. Keep only one scaffold per Murcko InChIKey (remove duplicates, arbitrary choice)
+    6. Merge and return the resulting Murcko scaffolds back to the original dataframe.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The dataframe to apply the function to.
+    smiles_col: str
+        The name of the column containing the Smiles strings.
+    col_prefix: str
+        The prefix to add to the Murcko columns (default: "Murcko_").
+
+    Returns:
+    ========
+    pd.DataFrame
+        The dataframe with the Murcko scaffolds, the InChIKeys and the number of heavy atoms of the scaffolds. There will be only one Murcko scaffold per InChIKey, and molecules without any rings will have the arbitrary scaffold "C".
+    """
+
+    df = df.copy()
+    df = murcko_from_smiles(df, filter_nans=False, add_inchikey=False)
+
+    # Replace the non-ring cases that do not have a Murcko scaffold with "C" (single carbon) to avoid NaN values in the "Murcko_Smiles" column.
+    df_nan = df[df["Murcko_Smiles"].isna()]
+    len(df_nan)
+
+    mask = df["Murcko_Smiles"].isna()
+    df.loc[mask, "Murcko_Smiles"] = "C"
+
+    if "NumHA" in df.columns:
+        df = df.rename(columns={"NumHA": "Mol_NumHA"})
+    df = standardize_df(df, "Murcko_Smiles")
+    df = add_desc(df, smiles_col="Murcko_Smiles", desc_cols="NumHA")
+    df = df.rename(columns={"NumHA": "Murcko_NumHA"})
+    if "NumHA" in df.columns:
+        df = df.rename(columns={"Mol_NumHA": "NumHA"})
+    df = inchi_from_smiles(df, "Murcko_Smiles", "Murcko_InChIKey")
+    df_murcko = (
+        df[["Murcko_Smiles", "Murcko_InChIKey"]]
+        .drop_duplicates(subset=["Murcko_InChIKey"])
+        .copy()
+    )
+
+    df = df.drop(columns=["Murcko_Smiles"])
+    df = pd.merge(df, df_murcko, on="Murcko_InChIKey", how="left")
+    if col_prefix != "Murcko_":
+        df = df.rename(
+            columns={
+                "Murcko_Smiles": f"{col_prefix}Smiles",
+                "Murcko_InChIKey": f"{col_prefix}InChIKey",
+                "Murcko_NumHA": f"{col_prefix}NumHA",
+            }
+        )
+    assert (
+        df["Murcko_Smiles"].nunique() == df["Murcko_InChIKey"].nunique()
+    ), f"Mismatch between Murcko_Smiles and Murcko_InChIKey ({df['Murcko_Smiles'].nunique()} vs {df['Murcko_InChIKey'].nunique()})"
+    if INTERACTIVE:
+        info(df, "add_murcko_std", f"{len(df_murcko):5d} unique scaffolds found.")
+    return df
+
+
 def sss(
     df: pd.DataFrame,
     query: str,
