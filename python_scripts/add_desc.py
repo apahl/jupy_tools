@@ -66,6 +66,7 @@ DESC = {
     "NumHAcc": rdMolDesc.CalcNumLipinskiHBA,
     "LogP": lambda x: round(Desc.MolLogP(x), 2),
     "TPSA": lambda x: round(rdMolDesc.CalcTPSA(x), 2),
+    "LabuteASA": lambda x: round(rdMolDesc.CalcLabuteASA(x), 2),
     "NumRotBd": rdMolDesc.CalcNumRotatableBonds,
     "NumAtOx": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 8]),
     "NumAtN": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 7]),
