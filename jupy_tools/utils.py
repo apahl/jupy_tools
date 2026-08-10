@@ -525,6 +525,7 @@ def add_desc(
         "NumHAcc": rdMolDesc.CalcNumLipinskiHBA,
         "LogP": lambda x: round(Desc.MolLogP(x), 2),
         "TPSA": lambda x: round(rdMolDesc.CalcTPSA(x), 2),
+        "LabuteASA": lambda x: round(rdMolDesc.CalcLabuteASA(x), 2),
         "NumRotBd": rdMolDesc.CalcNumRotatableBonds,
         "NumAtOx": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 8]),
         "NumAtN": lambda x: len([a for a in x.GetAtoms() if a.GetAtomicNum() == 7]),
@@ -1022,12 +1023,14 @@ def add_murcko_std(
     mask = df["Murcko_Smiles"].isna()
     df.loc[mask, "Murcko_Smiles"] = "C"
 
+    numha_present = False
     if "NumHA" in df.columns:
+        numha_present = True
         df = df.rename(columns={"NumHA": "Mol_NumHA"})
     df = standardize_df(df, "Murcko_Smiles")
     df = add_desc(df, smiles_col="Murcko_Smiles", desc_cols="NumHA")
     df = df.rename(columns={"NumHA": "Murcko_NumHA"})
-    if "NumHA" in df.columns:
+    if numha_present:
         df = df.rename(columns={"Mol_NumHA": "NumHA"})
     df = inchi_from_smiles(df, "Murcko_Smiles", "Murcko_InChIKey")
     df_murcko = (
