@@ -586,6 +586,19 @@ def calc_ic50(
     return result
 
 
+def invert_std_rel(df: pd.DataFrame, col: str) -> pd.DataFrame:
+    """When a dataframe contains a `relation` column with values (`<`, `>`, `=`) to qualify e.g. IC50 values, the relation should be inverted when the IC50 is converted to pIC50. This function inverts the relation in the given column in the DataFrame. The same is true for pIC50 -> IC50 conversions. The function returns a new DataFrame with the inverted relation values.
+    Values other than `<`, `>`, `=` are not changed, incl. NaN. The original DataFrame is not modified.
+    """
+    result = df.copy()
+    if col not in result.columns:
+        raise ValueError(f"Column `{col}` not found in DataFrame.")
+    relation_map = {"<": ">", ">": "<", "=": "="}
+    # result[col] = result[col].map(relation_map).fillna(result[col])  # takes 2x as long as the next line
+    result[col] = result[col].replace(relation_map)
+    return result
+
+
 def count_nans(df: pd.DataFrame, columns: Union[str, List[str], None] = None) -> int:
     """Count rows containing NANs in the `column`.
     When no column is given, count all NANs."""

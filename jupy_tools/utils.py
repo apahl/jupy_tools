@@ -448,12 +448,14 @@ def standardize_smiles(
     standardize=True,
     remove_stereo=False,
     canonicalize_tautomer=True,
+    debug=False,
 ) -> str:
     """Creates a molecule from the Smiles string and passes it to `standardize_mol().
 
     Returns:
     ========
     The Smiles string of the standardized molecule."""
+    log.debug(f"Standardizing: {smiles}")
     mol = smiles_to_mol(smiles)  # None handling is done in `standardize_mol`
     result = standardize_mol(
         mol,
@@ -466,7 +468,7 @@ def standardize_smiles(
     return result
 
 
-def standardize_df(df, smiles_col="Smiles", **kwargs) -> DataFrame:
+def standardize_df(df, smiles_col="Smiles", debug=False, **kwargs) -> DataFrame:
     """Standardize the structures in the DataFrame.
     The Smiles column is replaced by the standardized Smiles.
 
@@ -493,10 +495,12 @@ def standardize_df(df, smiles_col="Smiles", **kwargs) -> DataFrame:
     df = df.copy()
     if TQDM and len(df) > MIN_NUM_RECS_PROGRESS:
         df[smiles_col] = df[smiles_col].progress_apply(
-            lambda x: standardize_smiles(x, **kwargs)
+            lambda x: standardize_smiles(x, debug=debug, **kwargs)
         )
     else:
-        df[smiles_col] = df[smiles_col].apply(lambda x: standardize_smiles(x, **kwargs))
+        df[smiles_col] = df[smiles_col].apply(
+            lambda x: standardize_smiles(x, debug=debug, **kwargs)
+        )
     return df
 
 

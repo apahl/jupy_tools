@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "10-Aug-2026 14:00h (Set text tolor)"
+__version__ = "14-Aug-2026 16:00h (Add invert_std_rel)"
