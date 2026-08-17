@@ -455,7 +455,7 @@ def pic50(value: float, unit: str, digits: int = 2) -> float:
 
 
 def ic50(value: float, unit: str = None, digits: int = 2) -> float:
-    """Convert a negative logarithm (base 10) value back to its original concentration representation. The function returns the original value corresponding to the input negative logarithm, rounded to two decimal places. If the input value is NaN, the function returns NaN.
+    """Convert a negative logarithm (base 10) value (pic50) back to its original concentration representation. The function returns the original value corresponding to the input negative logarithm, rounded to two decimal places. If the input value is NaN, the function returns NaN.
 
     Parameters:
     ===========
@@ -498,7 +498,7 @@ def ic50(value: float, unit: str = None, digits: int = 2) -> float:
     return round(result, digits), unit
 
 
-def calc_pic50(
+def add_pic50_from_ic50(
     df: pd.DataFrame,
     value_col: str,
     unit_col: str,
@@ -539,7 +539,7 @@ def calc_pic50(
     return result
 
 
-def calc_ic50(
+def add_ic50_from_pic50(
     df: pd.DataFrame,
     value_col: str,
     unit_col: str,
