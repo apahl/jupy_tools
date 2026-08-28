@@ -302,6 +302,97 @@ document.querySelectorAll('th').forEach(th => th.addEventListener('click', (() =
 </script>"""
 
 
+# Full HTML page for `write_mol_table_ia()`, based on the DataTables.js library
+# (https://datatables.net/) with the ColReorder and Buttons (colvis) extensions.
+# Placeholders (replaced with plain str.replace, not str.format, because of the
+# large amount of literal `{}` in the embedded CSS / JS): @@TITLE@@, @@TABLE@@, @@MOL_COLS@@
+IA_TABLE_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@@TITLE@@</title>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/colreorder/1.7.0/css/colReorder.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+<style>
+body {
+  background-color: #FFFFFF;
+  font-family: freesans, arial, verdana, sans-serif;
+}
+table.dataTable thead th {
+  background-color: #94caef;
+  text-align: center;
+}
+table.dataTable thead th .col-title {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 3px;
+}
+table.dataTable thead th input {
+  font-weight: normal;
+  width: 90%;
+  box-sizing: border-box;
+}
+table.dataTable td {
+  text-align: center;
+  vertical-align: middle;
+}
+table.dataTable {
+  width: 100% !important;
+  margin: 0 !important;
+}
+</style>
+</head>
+<body>
+<h2>@@TITLE@@</h2>
+@@TABLE@@
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/colreorder/1.7.0/js/dataTables.colReorder.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
+<script>
+$(document).ready(function () {
+    var molCols = @@MOL_COLS@@;
+    var table = $('#mol_table').DataTable({
+        dom: 'Blfrtip',
+        buttons: ['colvis'],
+        colReorder: true,
+        autoWidth: false,
+        pageLength: 25,
+        lengthMenu: [10, 25, 50, 100, 250, 500],
+        columnDefs: [{ targets: molCols, orderable: false }],
+        initComplete: function () {
+            this.api()
+                .columns()
+                .every(function (colIdx) {
+                    if (molCols.indexOf(colIdx) !== -1) {
+                        return;
+                    }
+                    var header = $(this.header());
+                    var title = header.text();
+                    header.empty();
+                    $('<span class="col-title"></span>').text(title).appendTo(header);
+                    var input = $('<input type="text" placeholder="Filter" />').appendTo(header);
+                    var column = this;
+                    input.on('click', function (e) {
+                        e.stopPropagation();
+                    });
+                    input.on('keyup change clear', function () {
+                        if (column.search() !== this.value) {
+                            column.search(this.value).draw();
+                        }
+                    });
+                });
+        },
+    });
+});
+</script>
+</body>
+</html>"""
+
+
 def bootstrap_options(
     table: str, selectable=False, id_col="Compound_Id", height=1200
 ) -> str:

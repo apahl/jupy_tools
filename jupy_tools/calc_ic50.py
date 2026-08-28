@@ -14,6 +14,7 @@ from scipy.optimize import curve_fit
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+
 from . import utils as u, mol_view as mv
 
 
@@ -31,7 +32,7 @@ def four_parameter_logistic(
 def fit_ic50(
     concentration: np.ndarray, response: np.ndarray, direction: str = "increasing"
 ) -> tuple[float, str, np.ndarray]:
-    """Fit one curve and return its IC50, relation, and curve parameters."""
+    """Fit one curve and return its IC50, Qualifier, and curve parameters."""
     tested_min = float(np.min(concentration))
     tested_max = float(np.max(concentration))
     initial_ic50 = float(np.sqrt(tested_min * tested_max))
@@ -94,7 +95,7 @@ def plot_to_data_uri(
     axis.set_xlabel("Concentration (uM)")
     axis.set_ylabel("Inhibition (%)")
     axis.set_title(
-        f"{identifier}  |  {direction}  |  IC50 {relation} {ic50:.4g} uM"
+        f"{identifier}  |  {direction[:3]}  |  IC50 {relation} {ic50:.4g} uM"
         if fitted_parameters is not None
         else f"{identifier}  |  fit failed"
     )
@@ -121,42 +122,6 @@ def write_html_report(
     df_plots = df_plots.rename(columns={"identifier": id_col, "image": "DRC"})
     df = pd.merge(df, df_plots, how="left", on=id_col)
     mv.write_mol_table(df, title=title, fn=fn, id_col=id_col)
-
-
-# def write_html_report(
-#     output_path: Path, plots: list[dict[str, object]], results: pd.DataFrame
-# ) -> None:
-#     """Write a self-contained HTML report containing all compound plots."""
-#     sections = []
-#     for plot in plots:
-#         identifier = html.escape(str(plot["identifier"]))
-#         status = html.escape(str(plot["status"]))
-#         sections.append(
-#             f"<section><h2>{identifier}</h2><p>{status}</p>"
-#             f'<img src="{plot["image"]}" alt="Dose-response curve for {identifier}"></section>'
-#         )
-#     document = f"""<!doctype html>
-# <html lang="en">
-# <head>
-# <meta charset="utf-8">
-# <meta name="viewport" content="width=device-width, initial-scale=1">
-# <title>IC50 dose-response curves</title>
-# <style>
-# body {{ font-family: sans-serif; margin: 2rem auto; max-width: 900px; color: #202124; }}
-# header {{ border-bottom: 1px solid #ccc; margin-bottom: 2rem; }}
-# section {{ border-bottom: 1px solid #ddd; padding: 1rem 0 2rem; }}
-# h2 {{ margin-bottom: 0.25rem; }}
-# p {{ color: #555; margin-top: 0; }}
-# img {{ display: block; max-width: 100%; height: auto; }}
-# </style>
-# </head>
-# <body>
-# <header><h1>IC50 dose-response curves</h1><p>{len(results)} compounds</p></header>
-# {"".join(sections)}
-# </body>
-# </html>
-# """
-#     output_path.write_text(document, encoding="utf-8")
 
 
 def calc_ic50(
@@ -208,30 +173,30 @@ def calc_ic50(
         response = curve["value"].to_numpy(dtype=float)
         result: dict[str, object] = {
             id_col: identifier,
-            "ic50_uM": np.nan,
-            "relation": "",
-            "fit_status": "ok",
-            "concentrations_used": len(curve),
+            "IC50_uM": np.nan,
+            "Qualifier": "",
+            "Fit": "Ok",
+            "Num_Conc": len(curve),
         }
         fitted_parameters = None
         try:
-            result["ic50_uM"], result["relation"], fitted_parameters = fit_ic50(
+            result["IC50_uM"], result["Qualifier"], fitted_parameters = fit_ic50(
                 concentration, response, direction
             )
         except (RuntimeError, ValueError, OverflowError) as error:
-            result["fit_status"] = f"failed: {error}"
+            result["Fit"] = f"Fail: {error}"
         if create_plots:
             plots.append(
                 {
                     "identifier": identifier,
-                    "status": result["fit_status"],
+                    "status": result["Fit"],
                     "image": plot_to_data_uri(
                         str(identifier),
                         concentration,
                         response,
                         fitted_parameters,
-                        float(result["ic50_uM"] or np.nan),
-                        str(result["relation"]),
+                        float(result["IC50_uM"] or np.nan),
+                        str(result["Qualifier"]),
                         direction,
                     ),
                 }

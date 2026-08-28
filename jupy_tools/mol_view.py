@@ -315,7 +315,10 @@ class MolImage:
         else:
             img = b64_mol(img)
             self.b64 = f"data:image/png;base64,{img}"
-        self.tag = f"""<img {options} src="{self.b64}" alt="{self.alt_text}"/>"""
+        # Avoid consecutive spaces, which pandas' `to_html` turns into `&nbsp;`,
+        # breaking the tag when `options` is empty:
+        options_str = f"{options} " if options else ""
+        self.tag = f"""<img {options_str}src="{self.b64}" alt="{self.alt_text}"/>"""
 
     def save(self, fn):
         if (self.svg and not fn.lower().endswith("svg")) or (
@@ -903,6 +906,128 @@ def write_mol_table(
     html = "\n".join(lines)
     html = html + templ.TABLE_SORTER
     page = templ.page(html, title=title, header=header, summary=summary)
+    utils.write(fn, page)
+    if IPYTHON:
+        return HTML('<a href="{}">{}</a>'.format(fn, title))
+
+
+def write_mol_table_ia(
+    df: pd.DataFrame,
+    title: str = "MolTable",
+    fn: str = "moltable_ia.html",
+    id_col="Compound_Id",
+    smiles_col: str | List[str] = "Smiles",
+    size: int | List[int] = 300,
+    use_colors: bool | List[bool] = True,
+    drawing_options: Optional[DrawingOptions | List[DrawingOptions]] = None,
+    svg: Optional[bool] = None,
+    index=True,
+    **kwargs,
+):
+    """
+    Write an interactive HTML table of molecules to a file and return the link.
+
+    In contrast to `write_mol_table`, the resulting page is interactive
+    (implemented with the DataTables.js library, https://datatables.net/):
+    columns can be sorted by clicking their header, filtered with a per-column
+    text box, reordered by dragging the header, and shown / hidden with the
+    "Column visibility" button.
+
+    Args:
+        df: DataFrame with molecules.
+        title: Document title.
+        fn: Filename to write.
+        smiles_col: Column name or list of column names with Smiles.
+            Each column will be displayed as a separate molecule.
+
+    KWargs:
+        alt_text: whether to include Smiles (default) or the MolBlock as alt text.
+            Use e.g. the firefox extension `Copy Alt Text` to copy the alt text.
+
+    Image format options:
+        There are two ways to format the structure images:
+        1. Use the `size` and `use_colors` "quick access" options.
+        2. Pass a DrawingOptions dictionary as `drawing_options`. Use the function init_draw_options() to create a dict with default values.
+        When the second option is used, the `size` and `use_colors` options are ignored.
+        Each of the options can be either a single value or a list of values. If a list is passed,
+        it has to have the same length as the number of Smiles columns.
+
+        size: Size of the image in pixels (default=300). If this is a list,
+            each image column will be displayed with the corresponding size.
+        use_colors: Whether to use colors for atoms (default=True). If this is a list,
+            each image column will be displayed with the corresponding setting.
+        drawing_options: instance of `DrawingOptions` for the structure display.
+            If this is a list, each image column will be displayed with the corresponding options.
+    """
+    df = df.copy()
+    if index:
+        df = df.reset_index(drop=False)
+        df = df.rename(columns={"index": "#"})
+
+    # Need to check here, because the `add_image_tag` function will run in a try / except block:
+    alt_text = kwargs.get("alt_text", "smiles").lower()
+    if "smiles" not in alt_text and "block" not in alt_text:
+        raise ValueError(
+            f"Unknown value for `alt_text`: {alt_text}. Must be 'smiles' (default) or 'molblock'."
+        )
+
+    # Some sanity checks:
+    if svg is None:
+        svg = SVG
+    assert isinstance(svg, bool)
+    if isinstance(smiles_col, str):
+        smiles_col = [smiles_col]
+    for sc in smiles_col:
+        assert sc in df.keys(), f"Column {sc} not found in DataFrame."
+    if isinstance(size, int):
+        size = [size] * len(smiles_col)
+    if isinstance(use_colors, bool):
+        use_colors = [use_colors] * len(smiles_col)
+    if not isinstance(drawing_options, list):
+        drawing_options = [drawing_options] * len(smiles_col)
+    assert len(size) == len(smiles_col)
+    assert id_col in df.keys(), f"Id Column {id_col} not found in DataFrame."
+
+    cols = list(df.keys())
+    # When there is only one structure column, put it in front:
+    if len(smiles_col) == 1:
+        cols = [smiles_col[0]] + [x for x in cols if x != smiles_col[0]]
+    # Put the index column even firster:
+    if index:
+        cols = ["#"] + [x for x in cols if x != "#"]
+
+    # Add the image tags
+    for idx, sc in enumerate(smiles_col):
+        df = add_image_tag(
+            df,
+            f"{sc}_Mol",
+            size=size[idx],
+            use_colors=use_colors[idx],
+            drawing_options=drawing_options[idx],
+            svg=svg,
+            smiles_col=sc,
+            **kwargs,
+        )
+
+    # Replace the positions of the Smiles columns with the Mol columns:
+    for idx, sc in enumerate(smiles_col):
+        cols = [f"{sc}_Mol" if x == sc else x for x in cols]
+
+    # Drop the Smiles columns:
+    df = df[cols]
+
+    # 0-based column indices of the structure image columns (sorting / text filter
+    # do not make sense for these, they are excluded in the JS init code):
+    mol_col_idx = [cols.index(f"{sc}_Mol") for sc in smiles_col]
+
+    html_table = df.to_html(
+        table_id="mol_table", index=False, escape=False, classes="display"
+    )
+
+    page = templ.IA_TABLE_PAGE
+    page = page.replace("@@TITLE@@", title)
+    page = page.replace("@@TABLE@@", html_table)
+    page = page.replace("@@MOL_COLS@@", str(mol_col_idx))
     utils.write(fn, page)
     if IPYTHON:
         return HTML('<a href="{}">{}</a>'.format(fn, title))

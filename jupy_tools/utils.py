@@ -454,8 +454,11 @@ def standardize_smiles(
 
     Returns:
     ========
-    The Smiles string of the standardized molecule."""
+    The Smiles string of the standardized modef inchlecule."""
     log.debug(f"Standardizing: {smiles}")
+    # Short-circuiting non-structures:
+    if smiles == "*":
+        return "*"
     mol = smiles_to_mol(smiles)  # None handling is done in `standardize_mol`
     result = standardize_mol(
         mol,
@@ -863,6 +866,9 @@ def calc_from_smiles(
     """
 
     def _smiles_func(smiles):
+        # Short-circuiting non-structures:
+        if smiles == "*":
+            return np.nan
         mol = smiles_to_mol(smiles)
         if mol is np.nan:
             return np.nan
@@ -891,7 +897,7 @@ def calc_from_smiles(
 
 
 def inchi_from_smiles(
-    df: pd.DataFrame, smiles_col="Smiles", inchi_col="InChIKey", filter_nans=True
+    df: pd.DataFrame, smiles_col="Smiles", inchi_col="InChIKey", filter_nans=False
 ) -> pd.DataFrame:
     """Generate InChIKeys from Smiles.
 

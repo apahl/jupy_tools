@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "14-Aug-2026 16:00h (Add invert_std_rel)"
+__version__ = "17-Aug-2026 11:00h (Add module calc_ic50)"
