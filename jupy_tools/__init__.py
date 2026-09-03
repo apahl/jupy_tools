@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "17-Aug-2026 11:00h (Add module calc_ic50)"
+__version__ = "03-Sep-2026 13:35h (Add Pharm2D)"
