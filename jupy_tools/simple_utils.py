@@ -192,11 +192,17 @@ class Results:
                 r[0] = "• " + r[0]
                 if isinstance(r[1], float):
                     r[1] = f"{r[1]:.3f}"
+                elif isinstance(r[1], pd.DataFrame):
+                    r[1] = f"({r[1].shape[0]}x{r[1].shape[1]})"
                 else:
                     r[1] = str(r[1])
             self.list.append(r)
         if show:
             print(self.show(idx))
+
+    def sadd(self, *res):
+        """Silently add one or more result tuples to the instance without showing them."""
+        self.add(*res, show=False)
 
     def remove(self, n):
         """Remove the n last entries."""

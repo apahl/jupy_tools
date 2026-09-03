@@ -490,6 +490,8 @@ def standardize_df(df, smiles_col="Smiles", debug=False, **kwargs) -> DataFrame:
         Whether to standardize the molecule. Default: True
     remove_stereo: bool
         Whether to remove stereochemistry. Default: False
+    canonicalize_tautomer: bool
+        Whether to canonicalize tautomers. Default: True
 
     Returns:
     ========
@@ -1027,11 +1029,7 @@ def add_murcko_std(
     df = murcko_from_smiles(df, filter_nans=False, add_inchikey=False)
 
     # Replace the non-ring cases that do not have a Murcko scaffold with "C" (single carbon) to avoid NaN values in the "Murcko_Smiles" column.
-    df_nan = df[df["Murcko_Smiles"].isna()]
-    len(df_nan)
-
-    mask = df["Murcko_Smiles"].isna()
-    df.loc[mask, "Murcko_Smiles"] = "C"
+    df = replace_nans(df, "Murcko_Smiles", "C")
 
     numha_present = False
     if "NumHA" in df.columns:

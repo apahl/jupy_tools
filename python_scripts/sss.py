@@ -21,6 +21,8 @@ import pandas as pd
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Mol
+from rdkit import DataStructs
+from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 
 from rdkit import RDLogger
 
@@ -204,6 +206,8 @@ def process(
     format: str,
     add_h: str,
     keep_dupl: bool,
+    pharm2d: bool,
+    sim_cutoff: float,
     every_n: int,
 ):
     def _sss(m, qm):
@@ -245,6 +249,8 @@ def process(
         if query_mol is None:
             print(f"Failed to parse query Smiles/Smarts: {query}")
             return
+        if pharm2d:
+            query_mol = Generate.Gen2DFingerprint(query_mol, Gobbi_Pharm2D.factory)
         query_mols.append(query_mol)
 
     fn = fn.split(",")  # allow comma separated list of files
@@ -317,9 +323,17 @@ def process(
                 sd_props = set(header.copy())
                 header.append("Smiles")
 
+            if pharm2d:
+                mol_fp = Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory)
             for q_idx, query_mol in enumerate(query_mols):
-                if not _sss(mol, query_mol):
-                    continue
+                if pharm2d:
+                    # Calculate the similarity between the 2D pharmacophore fingerprints
+                    similarity = DataStructs.FingerprintSimilarity(mol_fp, query_mol)
+                    if similarity < sim_cutoff:
+                        continue
+                else:
+                    if not _sss(mol, query_mol):
+                        continue
 
                 if not keep_dupl:
                     inchi_key = rec.get("InChIKey", None)
@@ -344,6 +358,9 @@ def process(
                             continue
                         mol_props.add(prop)
                         d[prop] = rec[prop]
+                if pharm2d:
+                    mol_props.add(f"Sim_{q_idx}")
+                    d[f"Sim_{q_idx}"] = similarity
 
                 # append "" to the missing props that were not in the mol:
                 missing_props = sd_props - mol_props
@@ -426,10 +443,21 @@ Examples:
         help="Whether to keep duplicate hits in the output (default: False). If False, only the first hit from any query will be written to the output file. If True, all hits will be written, including duplicates. Duplicates will only be tracked when the input file contains an InChIKey column or record.",
     )
     parser.add_argument(
+        "--pharm2d",
+        action="store_true",
+        help="Whether to perform 2D pharmacophore search instead of the standard substructure search (default: False).",
+    )
+    parser.add_argument(
+        "--sim_cutoff",
+        type=float,
+        default=0.7,
+        help="The similarity cutoff for the 2D pharmacophore search (default: 0.7).",
+    )
+    parser.add_argument(
         "-n",
         type=int,
         default=5000,
-        help="Show info every `N` records (default: 1000).",
+        help="Show info every `N` records (default: 5000).",
     )
 
     args = parser.parse_args()
@@ -441,5 +469,7 @@ Examples:
         args.format,
         args.addh,
         args.duplicates,
+        args.pharm2d,
+        args.sim_cutoff,
         args.n,
     )
