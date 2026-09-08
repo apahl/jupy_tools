@@ -25,6 +25,7 @@ from rdkit.Chem import Mol
 from rdkit import DataStructs
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Chem import rdReducedGraphs as ERG
+from rdkit.Chem.Fraggle.FraggleSim import GetFraggleSimilarity
 
 from rdkit import RDLogger
 
@@ -219,6 +220,7 @@ def process(
     keep_dupl: bool,
     pharm2d: bool,
     erg: bool,
+    fraggle: bool,
     sim_cutoff: float,
     every_n: int,
 ):
@@ -335,7 +337,7 @@ def process(
                 first_rec = False
                 header = [x for x in rec if x != "Mol"]
                 sd_props = set(header.copy())
-                if pharm2d:
+                if pharm2d or erg or fraggle:
                     header.append(f"Sim")
                 header.append("Smiles")
 
@@ -351,6 +353,10 @@ def process(
                         continue
                 elif erg:
                     similarity = erg_sim(mol_fp, query_mol)
+                    if similarity < sim_cutoff:
+                        continue
+                elif fraggle:
+                    similarity = GetFraggleSimilarity(mol, query_mol)
                     if similarity < sim_cutoff:
                         continue
                 else:
@@ -369,9 +375,11 @@ def process(
                     first_hit[q_idx] = False
                     result_str = "sss"
                     if pharm2d:
-                        result_str = "pharm2d"
+                        result_str = f"pharm2d_{sim_cutoff:.2f}"
                     elif erg:
-                        result_str = "erg"
+                        result_str = f"erg_{sim_cutoff:.2f}"
+                    elif fraggle:
+                        result_str = f"fraggle_{sim_cutoff:.2f}"
                     out_fn = f"{fn_base}_{result_str}_{q_idx}.tsv"
                     outfiles[q_idx] = open(out_fn, "w", encoding="utf-8")
 
@@ -385,7 +393,7 @@ def process(
                             continue
                         mol_props.add(prop)
                         d[prop] = rec[prop]
-                if pharm2d or erg:
+                if pharm2d or erg or fraggle:
                     mol_props.add("Sim")
                     d["Sim"] = similarity
 
@@ -480,6 +488,11 @@ Examples:
         help="Whether to perform ErG fingerprint similarity search instead of the standard substructure search (default: False).",
     )
     parser.add_argument(
+        "--fraggle",
+        action="store_true",
+        help="Whether to perform Fraggle similarity search instead of the standard substructure search (default: False).",
+    )
+    parser.add_argument(
         "--sim_cutoff",
         type=float,
         default=0.7,
@@ -503,6 +516,7 @@ Examples:
         args.duplicates,
         args.pharm2d,
         args.erg,
+        args.fraggle,
         args.sim_cutoff,
         args.n,
     )
