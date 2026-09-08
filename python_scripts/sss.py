@@ -18,11 +18,13 @@ import argparse
 
 
 import pandas as pd
+import numpy as np
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Mol
 from rdkit import DataStructs
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
+from rdkit.Chem import rdReducedGraphs as ERG
 
 from rdkit import RDLogger
 
@@ -106,6 +108,15 @@ def smiles_to_mol(smiles: str) -> Mol:
         return None
     except:
         return None
+
+
+# ErG FP is not bit vect.
+def erg_sim(fp1, fp2):
+    denominator = (
+        np.sum(np.dot(fp1, fp1)) + np.sum(np.dot(fp2, fp2)) - np.sum(np.dot(fp1, fp2))
+    )
+    numerator = np.sum(np.dot(fp1, fp2))
+    return numerator / denominator
 
 
 def csv_supplier(fo, dialect):
@@ -207,6 +218,7 @@ def process(
     add_h: str,
     keep_dupl: bool,
     pharm2d: bool,
+    erg: bool,
     sim_cutoff: float,
     every_n: int,
 ):
@@ -251,6 +263,8 @@ def process(
             return
         if pharm2d:
             query_mol = Generate.Gen2DFingerprint(query_mol, Gobbi_Pharm2D.factory)
+        elif erg:
+            query_mol = ERG.GetErGFingerprint(query_mol)
         query_mols.append(query_mol)
 
     fn = fn.split(",")  # allow comma separated list of files
@@ -321,14 +335,22 @@ def process(
                 first_rec = False
                 header = [x for x in rec if x != "Mol"]
                 sd_props = set(header.copy())
+                if pharm2d:
+                    header.append(f"Sim")
                 header.append("Smiles")
 
             if pharm2d:
                 mol_fp = Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory)
+            elif erg:
+                mol_fp = ERG.GetErGFingerprint(mol)
             for q_idx, query_mol in enumerate(query_mols):
                 if pharm2d:
                     # Calculate the similarity between the 2D pharmacophore fingerprints
                     similarity = DataStructs.FingerprintSimilarity(mol_fp, query_mol)
+                    if similarity < sim_cutoff:
+                        continue
+                elif erg:
+                    similarity = erg_sim(mol_fp, query_mol)
                     if similarity < sim_cutoff:
                         continue
                 else:
@@ -345,7 +367,12 @@ def process(
 
                 if first_hit[q_idx]:
                     first_hit[q_idx] = False
-                    out_fn = f"{fn_base}_sss_{q_idx}.tsv"
+                    result_str = "sss"
+                    if pharm2d:
+                        result_str = "pharm2d"
+                    elif erg:
+                        result_str = "erg"
+                    out_fn = f"{fn_base}_{result_str}_{q_idx}.tsv"
                     outfiles[q_idx] = open(out_fn, "w", encoding="utf-8")
 
                     outfiles[q_idx].write("\t".join(header) + "\n")
@@ -358,9 +385,9 @@ def process(
                             continue
                         mol_props.add(prop)
                         d[prop] = rec[prop]
-                if pharm2d:
-                    mol_props.add(f"Sim_{q_idx}")
-                    d[f"Sim_{q_idx}"] = similarity
+                if pharm2d or erg:
+                    mol_props.add("Sim")
+                    d["Sim"] = similarity
 
                 # append "" to the missing props that were not in the mol:
                 missing_props = sd_props - mol_props
@@ -448,6 +475,11 @@ Examples:
         help="Whether to perform 2D pharmacophore search instead of the standard substructure search (default: False).",
     )
     parser.add_argument(
+        "--erg",
+        action="store_true",
+        help="Whether to perform ErG fingerprint similarity search instead of the standard substructure search (default: False).",
+    )
+    parser.add_argument(
         "--sim_cutoff",
         type=float,
         default=0.7,
@@ -470,6 +502,7 @@ Examples:
         args.addh,
         args.duplicates,
         args.pharm2d,
+        args.erg,
         args.sim_cutoff,
         args.n,
     )

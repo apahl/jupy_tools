@@ -142,6 +142,15 @@ def add_fps(
     return df
 
 
+# ErG FP is not bit vect.
+def erg_sim(fp1, fp2):
+    denominator = (
+        np.sum(np.dot(fp1, fp1)) + np.sum(np.dot(fp2, fp2)) - np.sum(np.dot(fp1, fp2))
+    )
+    numerator = np.sum(np.dot(fp1, fp2))
+    return numerator / denominator
+
+
 def add_erg_fps(df: pd.DataFrame, smiles_col="Smiles", prefix="ErG") -> pd.DataFrame:
     """Add a ErG fingerprint column to the DataFrame.
     Because the bits are inherently explainable, each of the 315 positions
