@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "08-Sep-2026 12:30h (Add ErG and Fraggle)"
+__version__ = "09-Sep-2026 09:00h (Improve logging)"

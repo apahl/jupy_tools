@@ -225,7 +225,7 @@ def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
     if isinstance(obj, str):
         if label is None:
             label_str = "String"
-        print(f"{label_str:{lpad}s}: {obj:>{rpad}s}")
+        log.info(f"{label_str:{lpad}s}: {obj:>{rpad}s}")
         return
 
     try:
@@ -245,7 +245,7 @@ def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
                 has_nan_str = f"( NAN values in {num_nan_cols} col(s) )"
         except AttributeError:
             pass
-        print(
+        log.info(
             f"{label_str:{lpad}s}: {shape[0]:{rpad}d} / {shape[1]:{4}d} {key_str} {has_nan_str}"
         )
         return
@@ -269,7 +269,7 @@ def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
         has_nan_str = ""
         if num_nan_cols > 0:  # DF has nans
             has_nan_str = f"( NAN values in {num_nan_cols} col(s) )"
-        print(
+        log.info(
             f"{label_str:{lpad}s}:   {shape[0]:{rpad}d} / {shape[1]:{4}d} {key_str} {has_nan_str}"
         )
         return
@@ -281,9 +281,9 @@ def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
         if label is None:
             label_str = "Number"
         if fval == obj:
-            print(f"{label_str:{lpad}s}:   {int(obj):{rpad}d}")
+            log.info(f"{label_str:{lpad}s}:   {int(obj):{rpad}d}")
         else:
-            print(f"{label_str:{lpad}s}:   {obj:{rpad+6}.5f}")
+            log.info(f"{label_str:{lpad}s}:   {obj:{rpad+6}.5f}")
         return
     except (ValueError, TypeError):
         # print("Exception")
@@ -295,14 +295,14 @@ def lp(obj, label: str = None, lpad=INFO_WIDTH, rpad=7):
             label_str = "Length"
         else:
             label_str = f"Length {label}"
-        print(f"{label_str:{lpad}s}:   {length:{rpad}d}")
+        log.info(f"{label_str:{lpad}s}:   {length:{rpad}d}")
         return
     except (TypeError, AttributeError):
         pass
 
     if label is None:
         label_str = "Object"
-    print(f"{label_str:{lpad}s}:   {obj}")
+    log.info(f"{label_str:{lpad}s}:   {obj}")
 
 
 def info(df: pd.DataFrame, fn: str = "Shape", what: str = ""):
