@@ -23,4 +23,4 @@ if LOGURU:
         ]
     )
 
-__version__ = "09-Sep-2026 09:00h (Improve logging)"
+__version__ = "16-Sep-2026 11:00h (Log filename)"

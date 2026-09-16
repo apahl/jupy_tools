@@ -874,7 +874,11 @@ def read_tsv(
         time_stamp = datetime.datetime.fromtimestamp(
             p_input_tsv.stat().st_mtime
         ).strftime("%Y-%m-%d %H:%M")
-        info(df, f"read_tsv (mod.: {time_stamp})")
+        if len(p_input_tsv.__str__()) <= 50:
+            fn = p_input_tsv.__str__()
+        else:
+            fn = p_input_tsv.name
+        info(df, f"read_tsv ({fn}, mod.: {time_stamp})")
     return df
 
 
