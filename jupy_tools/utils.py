@@ -1075,17 +1075,13 @@ def add_murcko_std(
     return df
 
 
-def cluster_mols(
-    df: pd.DataFrame, id_col: str, smiles_col: str, fp: str, cutoff: float
-):
+def cluster_mols(df: pd.DataFrame, smiles_col: str, fp: str, cutoff: float):
     """Cluster molecules based on their fingerprints.
 
     Parameters:
     ===========
     df: pd.DataFrame
         The dataframe containing the molecules.
-    id_col: str
-        The name of the column containing unique molecule identifiers.
     smiles_col: str
         The name of the column containing the Smiles strings.
     fp: Any
