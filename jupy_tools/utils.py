@@ -37,6 +37,7 @@ try:
     from rdkit.Chem import rdMolDescriptors as rdMolDesc
     from rdkit.Chem import Fragments
     from rdkit.Chem.Scaffolds import MurckoScaffold
+    from rdkit.ML.Cluster import Butina
 
     from rdkit.Chem.MolStandardize.rdMolStandardize import (
         CleanupInPlace,
@@ -1071,6 +1072,59 @@ def add_murcko_std(
     ), f"Mismatch between Murcko_Smiles and Murcko_InChIKey ({df['Murcko_Smiles'].nunique()} vs {df['Murcko_InChIKey'].nunique()})"
     if INTERACTIVE:
         info(df, "add_murcko_std", f"{len(df_murcko):5d} unique scaffolds found.")
+    return df
+
+
+def cluster_mols(
+    df: pd.DataFrame, id_col: str, smiles_col: str, fp: str, cutoff: float
+):
+    """Cluster molecules based on their fingerprints.
+
+    Parameters:
+    ===========
+    df: pd.DataFrame
+        The dataframe containing the molecules.
+    id_col: str
+        The name of the column containing unique molecule identifiers.
+    smiles_col: str
+        The name of the column containing the Smiles strings.
+    fp: Any
+        The fingerprint name (e.g. "ECFC4")
+    cutoff: float
+        The similarity cutoff (0-1) for clustering. Higher values result in more stringent clustering.
+
+    Returns:
+    ========
+    pd.DataFrame
+        The dataframe with two additional columns ("Cluster_No", "Is_Center") indicating the cluster assignment- The returned dataframe has its index reset. The original dataframe is not modified.
+    """
+    if fp not in FPDICT:
+        raise ValueError(f"Fingerprint '{fp}' is not supported.")
+    df = df.copy()
+    df = df.reset_index(drop=True)
+    mols = [smiles_to_mol(smi) for smi in df[smiles_col]]
+    if any(m is np.nan for m in mols):
+        raise ValueError("Some SMILES could not be converted to RDKit molecules.")
+    fps = [FPDICT[fp](m) for m in mols]
+    dists = []
+    nfps = len(fps)
+    for i in range(1, nfps):
+        sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[:i])
+        dists.extend([1 - x for x in sims])
+    clusters = Butina.ClusterData(dists, nfps, 1 - cutoff, isDistData=True)
+    cluster_map = {}
+    for cluster_id, cluster in enumerate(clusters, start=1):
+        for idx in cluster:
+            cluster_map[idx] = cluster_id
+    df["Cluster_No"] = df.index.map(cluster_map)
+    # Determine the center of each cluster (first molecule in each cluster)
+    cluster_centers = {
+        cluster_id: cluster[0] for cluster_id, cluster in enumerate(clusters, start=1)
+    }
+    df["Is_Center"] = df.index.map(
+        lambda idx: cluster_map[idx] in cluster_centers
+        and cluster_centers[cluster_map[idx]] == idx
+    )
     return df
 
 
